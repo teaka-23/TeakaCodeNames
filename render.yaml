@@ -13,7 +13,6 @@ services:
     buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
-    maxShutdownDelaySeconds: 30
     buildFilter:
       paths:
         - backend/**
