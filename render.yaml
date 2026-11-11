@@ -10,14 +10,11 @@ services:
     plan: free
     region: frankfurt
     rootDir: backend
-    buildCommand: npm ci && npm run build
+    # --include=dev: vite/tsc live in devDependencies; NODE_ENV=production
+    # would otherwise make `npm ci` omit them and break the build.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
-    buildFilter:
-      paths:
-        - backend/**
-      ignoredPaths:
-        - frontend/**
     envVars:
       - key: NODE_VERSION
         value: "22"
@@ -28,23 +25,16 @@ services:
       # In-memory rooms on Free (no persistent disk). For paid + disk, set
       # PERSISTENCE_DRIVER=file and PERSISTENCE_FILE=/data/rooms.json.
       - key: CORS_ORIGINS
-        fromService:
-          name: codenames-web
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://codenames-web.onrender.com
 
   # ── Frontend (Vite static SPA) ─────────────────────────────────
   - type: web
     name: codenames-web
     runtime: static
     rootDir: frontend
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
+    # Relative to rootDir (see Render monorepo docs)
     staticPublishPath: dist
-    buildFilter:
-      paths:
-        - frontend/**
-      ignoredPaths:
-        - backend/**
     routes:
       - type: rewrite
         source: /*
@@ -60,7 +50,4 @@ services:
         value: "true"
       # Baked into the SPA at build time (browser → public API URL)
       - key: VITE_BACKEND_URL
-        fromService:
-          name: codenames-api
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://codenames-api.onrender.com

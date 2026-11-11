@@ -25,8 +25,11 @@ npm run build
 | `codenames-api` | Web Service (Node) | `https://codenames-api.onrender.com` |
 | `codenames-web` | Static Site | `https://codenames-web.onrender.com` |
 
-Фронт на сборке получает `VITE_BACKEND_URL` с публичного URL API.
-Бэкенд берёт `CORS_ORIGINS` с URL фронта. WebSocket: `wss://…/ws`.
+Фронт на сборке получает `VITE_BACKEND_URL=https://codenames-api.onrender.com`.
+Бэкенд: `CORS_ORIGINS=https://codenames-web.onrender.com`. WebSocket: `wss://…/ws`.
+
+Если Render добавит суффикс к имени сервиса — поправьте эти два URL в Dashboard
+и сделайте Manual Deploy у static site (чтобы Vite пересобрал бандл).
 
 ### Шаги
 
