@@ -13,8 +13,10 @@ class MockWebSocket {
   onerror: ((ev: Event) => void) | null = null;
   sent: string[] = [];
   closedWith: number | null = null;
+  url: string;
 
-  constructor(public url: string) {
+  constructor(url: string) {
+    this.url = url;
     MockWebSocket.instances.push(this);
     if (MockWebSocket.autoOpen) {
       queueMicrotask(() => {

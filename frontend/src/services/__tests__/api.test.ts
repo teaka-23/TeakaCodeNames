@@ -39,10 +39,10 @@ describe('api', () => {
     mockPost.mockResolvedValue({ data: { roomId: 'R1' } });
     const { api } = await loadApi();
 
-    await api.createRoom('Alice', 'nature', 90);
+    await api.createRoom('Alice', 'movies', 90);
     expect(mockPost).toHaveBeenCalledWith('/rooms', {
       playerName: 'Alice',
-      theme: 'nature',
+      theme: 'movies',
       turnSeconds: 90,
     });
 
