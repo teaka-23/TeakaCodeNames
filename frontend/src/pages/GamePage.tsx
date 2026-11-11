@@ -603,7 +603,7 @@ function GamePage() {
   }
 
   return (
-    <div className="game-container">
+    <div className="game-container is-playing">
       {notification && (
         <div className="toast-notification" role="status" aria-live="polite">
           {notification}

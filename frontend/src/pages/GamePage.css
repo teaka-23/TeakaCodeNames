@@ -103,6 +103,88 @@
   padding: 1rem 1.25rem 2.5rem;
 }
 
+/* Active match: keep the 5×5 board in the first viewport */
+.game-container.is-playing {
+  height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0.55rem 1rem 0.65rem;
+  box-sizing: border-box;
+}
+
+.game-container.is-playing .game-header {
+  margin-bottom: 0.45rem;
+  flex-shrink: 0;
+}
+
+.game-container.is-playing .spymaster-panel,
+.game-container.is-playing .spectator-panel,
+.game-container.is-playing .mark-mode-banner,
+.game-container.is-playing .connection-banner {
+  flex-shrink: 0;
+  margin-bottom: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.game-container.is-playing .scoreboard {
+  flex-shrink: 0;
+  margin-bottom: 0.4rem;
+  gap: 0.55rem;
+}
+
+.game-container.is-playing .team-score {
+  padding: 0.45rem 0.7rem;
+}
+
+.game-container.is-playing .score-value {
+  font-size: 1.35rem;
+}
+
+.game-container.is-playing .turn-timer {
+  flex-shrink: 0;
+  margin: 0 0 0.35rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.game-container.is-playing .timer-value {
+  font-size: 1.1rem;
+}
+
+.game-container.is-playing .clue-display {
+  flex-shrink: 0;
+  margin: 0 0 0.35rem;
+}
+
+.game-container.is-playing .clue-prompt,
+.game-container.is-playing .clue-card {
+  padding: 0.55rem 0.75rem;
+}
+
+.game-container.is-playing .btn-skip {
+  flex-shrink: 0;
+  margin-bottom: 0.35rem;
+}
+
+.game-container.is-playing .game-main-row {
+  flex: 1;
+  min-height: 0;
+  margin-top: 0.25rem;
+  align-items: stretch;
+}
+
+.game-container.is-playing .side-panel {
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.game-container.is-playing .player-list {
+  display: none;
+}
+
 .game-header {
   display: flex;
   justify-content: space-between;
@@ -613,6 +695,14 @@
 }
 
 @media (max-width: 900px) {
+  .game-container.is-playing {
+    padding: 0.45rem 0.65rem 0.55rem;
+  }
+
+  .game-container.is-playing .game-main-row {
+    padding-bottom: 3.75rem; /* room for journal FAB */
+  }
+
   .game-main-row {
     grid-template-columns: 1fr;
     padding-bottom: 4.5rem;
