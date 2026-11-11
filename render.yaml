@@ -1,0 +1,67 @@
+# Render Blueprint — Codenames IT Edition
+# Dashboard: https://dashboard.render.com/ → New → Blueprint
+# Docs: https://render.com/docs/infrastructure-as-code
+
+services:
+  # ── Backend (Express + WebSocket) ──────────────────────────────
+  - type: web
+    name: codenames-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    maxShutdownDelaySeconds: 30
+    buildFilter:
+      paths:
+        - backend/**
+      ignoredPaths:
+        - frontend/**
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
+      # In-memory rooms on Free (no persistent disk). For paid + disk, set
+      # PERSISTENCE_DRIVER=file and PERSISTENCE_FILE=/data/rooms.json.
+      - key: CORS_ORIGINS
+        fromService:
+          name: codenames-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+  # ── Frontend (Vite static SPA) ─────────────────────────────────
+  - type: web
+    name: codenames-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    buildFilter:
+      paths:
+        - frontend/**
+      ignoredPaths:
+        - backend/**
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
+      # Baked into the SPA at build time (browser → public API URL)
+      - key: VITE_BACKEND_URL
+        fromService:
+          name: codenames-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL

@@ -11,9 +11,43 @@
   background: #16213e;
   border-radius: 16px;
   padding: 2.5rem;
-  max-width: 500px;
+  max-width: 560px;
   width: 100%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.theme-option {
+  text-align: left;
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+  color: #fff;
+  cursor: pointer;
+}
+
+.theme-option.selected {
+  border-color: #fbbf24;
+  background: #1a3a6b;
+}
+
+.theme-title {
+  display: block;
+  font-weight: 700;
+}
+
+.theme-blurb {
+  display: block;
+  margin-top: 0.2rem;
+  color: #9aa4b8;
+  font-size: 0.78rem;
+  font-weight: 500;
 }
 
 .input-section {
@@ -160,7 +194,8 @@
   margin-bottom: 0.75rem;
 }
 
-.room-code {
+.room-code,
+.room-link {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
@@ -168,7 +203,8 @@
   padding: 1rem 2rem;
   border-radius: 8px;
   cursor: pointer;
-  margin: 1rem 0;
+  margin: 0.75rem 0;
+  max-width: 100%;
 }
 
 .room-code span {
@@ -176,6 +212,13 @@
   font-weight: 700;
   letter-spacing: 0.25rem;
   color: #fff;
+}
+
+.room-link span {
+  font-size: 0.85rem;
+  color: #c7d2fe;
+  word-break: break-all;
+  text-align: left;
 }
 
 .copy-btn {

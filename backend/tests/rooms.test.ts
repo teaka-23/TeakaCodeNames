@@ -48,6 +48,31 @@ describe('POST /api/rooms', () => {
 
     expect(res1.body.roomId).not.toBe(res2.body.roomId);
   });
+
+  it('should default the theme to IT', async () => {
+    const res = await request(app)
+      .post('/api/rooms')
+      .send({ playerName: 'Host' })
+      .expect(200);
+
+    expect(res.body.gameState.theme).toBe('it');
+  });
+
+  it('should remember a chosen theme', async () => {
+    const res = await request(app)
+      .post('/api/rooms')
+      .send({ playerName: 'Host', theme: 'yoga' })
+      .expect(200);
+
+    expect(res.body.gameState.theme).toBe('yoga');
+  });
+
+  it('should reject an unknown theme', async () => {
+    await request(app)
+      .post('/api/rooms')
+      .send({ playerName: 'Host', theme: 'space' })
+      .expect(400);
+  });
 });
 
 describe('POST /api/rooms/:roomId/join', () => {

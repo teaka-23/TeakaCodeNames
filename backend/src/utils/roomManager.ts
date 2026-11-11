@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { GameState, Player } from '../types';
+import type { GameState, Player, ThemeId } from '../types';
 import { createGameState, generateCards, handleGuess } from './gameLogic';
 import type { WebSocket } from 'ws';
 import {
@@ -40,8 +40,11 @@ export class RoomManager {
 
     const persisted = await this.store.load();
     for (const snapshot of persisted) {
+      const theme = snapshot.gameState.theme ?? 'it';
+      const clueHistory = snapshot.gameState.clueHistory ?? [];
       this.rooms.set(snapshot.id, {
         ...snapshot,
+        gameState: { ...snapshot.gameState, theme, clueHistory },
         playerConnections: new Map(),
       });
     }
@@ -79,7 +82,7 @@ export class RoomManager {
     return this.store.label;
   }
 
-  create(playerName: string, playerId: string): GameRoom {
+  create(playerName: string, playerId: string, theme: ThemeId = 'it'): GameRoom {
     let roomId = generateRoomId();
     // Ensure uniqueness
     while (this.rooms.has(roomId)) {
@@ -94,7 +97,7 @@ export class RoomManager {
       role: 'guesser',
     };
 
-    const gameState = createGameState(roomId, [player]);
+    const gameState = createGameState(roomId, [player], theme);
 
     const room: GameRoom = {
       id: roomId,
@@ -166,17 +169,74 @@ export class RoomManager {
     return room.gameState.players.filter((p: Player) => p.role !== 'spectator').length;
   }
 
+  private teamActiveCount(room: GameRoom, team: 'red' | 'blue'): number {
+    return room.gameState.players.filter(
+      (p: Player) => p.team === team && p.role !== 'spectator'
+    ).length;
+  }
+
+  /**
+   * Sit at a team seat while the lobby is waiting.
+   * Claiming spymaster demotes the previous spymaster of that team to guesser.
+   */
+  claimSeat(
+    roomId: string,
+    playerId: string,
+    team: 'red' | 'blue',
+    role: 'spymaster' | 'guesser'
+  ): GameRoom {
+    const room = this.rooms.get(roomId);
+    if (!room) {
+      throw new Error('Room not found');
+    }
+    if (room.gameState.status !== 'waiting') {
+      throw new Error('Game already started');
+    }
+
+    const player = room.gameState.players.find((p: Player) => p.id === playerId);
+    if (!player) {
+      throw new Error('Player not found');
+    }
+
+    const wasSpectator = player.role === 'spectator';
+    if (wasSpectator && this.activePlayerCount(room) >= room.maxPlayers) {
+      throw new Error('Room is full');
+    }
+
+    const leavingTeam = !wasSpectator && player.team !== team;
+    const joiningTeam = wasSpectator || leavingTeam;
+    if (joiningTeam && this.teamActiveCount(room, team) >= 3) {
+      throw new Error('Team is full');
+    }
+
+    if (role === 'spymaster') {
+      for (const other of room.gameState.players) {
+        if (other.id !== playerId && other.team === team && other.role === 'spymaster') {
+          other.role = 'guesser';
+        }
+      }
+    }
+
+    player.team = team;
+    player.role = role;
+    this.schedulePersist();
+    return room;
+  }
+
   start(roomId: string): GameRoom {
     const room = this.rooms.get(roomId);
     if (!room) {
       throw new Error('Room not found');
     }
 
+    if (room.gameState.status !== 'waiting') {
+      throw new Error('Game already started');
+    }
+
     if (this.activePlayerCount(room) < 3) {
       throw new Error('Need at least 3 players to start');
     }
 
-    // Assign spymasters (first active player of each team)
     const redPlayers = room.gameState.players.filter(
       (p: Player) => p.team === 'red' && p.role !== 'spectator'
     );
@@ -184,12 +244,23 @@ export class RoomManager {
       (p: Player) => p.team === 'blue' && p.role !== 'spectator'
     );
 
-    if (redPlayers.length > 0) redPlayers[0].role = 'spymaster';
-    if (bluePlayers.length > 0) bluePlayers[0].role = 'spymaster';
+    if (redPlayers.length === 0 || bluePlayers.length === 0) {
+      throw new Error('Both teams need at least one player');
+    }
 
-    room.gameState.cards = generateCards();
+    // Keep seats players already claimed; fill missing spymasters from the first seat.
+    if (!redPlayers.some((p: Player) => p.role === 'spymaster')) {
+      redPlayers[0].role = 'spymaster';
+    }
+    if (!bluePlayers.some((p: Player) => p.role === 'spymaster')) {
+      bluePlayers[0].role = 'spymaster';
+    }
+
+    room.gameState.cards = generateCards(room.gameState.theme ?? 'it');
     room.gameState.status = 'spymaster-ready';
     room.gameState.currentTurn = Math.random() < 0.5 ? 'red' : 'blue';
+    room.gameState.clues = null;
+    room.gameState.clueHistory = [];
     room.gameState.turnDeadline = null;
     room.gameState.winner = null;
     this.clearTurnTimer(roomId);
@@ -318,12 +389,14 @@ export class RoomManager {
     playerCount: number;
     maxPlayers: number;
     status: RoomStatus;
+    theme: ThemeId;
   }> {
     return Array.from(this.rooms.values()).map(room => ({
       id: room.id,
       playerCount: room.gameState.players.length,
       maxPlayers: room.maxPlayers,
       status: room.gameState.status,
+      theme: room.gameState.theme ?? 'it',
     }));
   }
 

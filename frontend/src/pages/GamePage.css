@@ -108,6 +108,17 @@
   color: #fff;
 }
 
+.theme-chip {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+}
+
 .player-info {
   display: flex;
   align-items: center;
@@ -171,6 +182,200 @@
 .btn-skip:hover {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
+}
+
+.lobby-wait {
+  margin-top: 1rem;
+  padding: 1.5rem;
+  background: #16213e;
+  border-radius: 16px;
+}
+
+.lobby-wait h2 {
+  margin: 0 0 0.5rem;
+  color: #fff;
+}
+
+.lobby-wait > p {
+  color: #9aa4b8;
+  margin-bottom: 1.25rem;
+}
+
+.invite-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.invite-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: #0f3460;
+  border-radius: 8px;
+}
+
+.invite-label {
+  color: #9aa4b8;
+  font-size: 0.85rem;
+  min-width: 3.5rem;
+}
+
+.invite-link {
+  flex: 1;
+  color: #c7d2fe;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.seat-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.seat-column {
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.seat-column.team-red {
+  border-color: rgba(255, 107, 107, 0.35);
+}
+
+.seat-column.team-blue {
+  border-color: rgba(107, 181, 255, 0.35);
+}
+
+.seat-column h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+
+.seat-slot {
+  margin-bottom: 1rem;
+}
+
+.seat-label {
+  display: block;
+  color: #9aa4b8;
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.seat-player {
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 0.4rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.seat-player.me {
+  border: 1px solid #fbbf24;
+}
+
+.btn-seat {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  margin-bottom: 0.4rem;
+  border-radius: 6px;
+  border: 1px dashed #666;
+  background: transparent;
+  color: #ddd;
+  cursor: pointer;
+}
+
+.btn-seat:hover:not(:disabled) {
+  border-color: #fbbf24;
+  color: #fff;
+}
+
+.btn-seat.secondary {
+  border-style: solid;
+  border-color: #444;
+  font-size: 0.85rem;
+}
+
+.btn-seat:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-start-game {
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+  color: #16213e;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-start-game:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lobby-note {
+  color: #cbd5e1;
+  margin-bottom: 1rem;
+}
+
+.clue-history {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #16213e;
+  border-radius: 12px;
+}
+
+.clue-history h4 {
+  margin: 0 0 0.75rem;
+  color: #aaa;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.clue-history ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.clue-history-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.clue-history-item.team-red {
+  border: 1px solid rgba(255, 107, 107, 0.45);
+}
+
+.clue-history-item.team-blue {
+  border: 1px solid rgba(107, 181, 255, 0.45);
+}
+
+@media (max-width: 700px) {
+  .seat-board {
+    grid-template-columns: 1fr;
+  }
 }
 
 .player-list {

@@ -1,158 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GameBoard from '../components/GameBoard';
 import Scoreboard from '../components/Scoreboard';
-import type { TeamColor } from '../types';
+import { api } from '../services/api';
+import { THEMES, type ThemeId } from '../data/themes';
+import type { Card, CardColor, TeamColor } from '../types';
 import './DemoPage.css';
-
-// Import word database directly
-const itWords = [
-  { word: 'JavaScript', category: 'languages' },
-  { word: 'Python', category: 'languages' },
-  { word: 'TypeScript', category: 'languages' },
-  { word: 'Java', category: 'languages' },
-  { word: 'Rust', category: 'languages' },
-  { word: 'Go', category: 'languages' },
-  { word: 'Ruby', category: 'languages' },
-  { word: 'Swift', category: 'languages' },
-  { word: 'Kotlin', category: 'languages' },
-  { word: 'CSharp', category: 'languages' },
-  { word: 'PHP', category: 'languages' },
-  { word: 'Scala', category: 'languages' },
-  { word: 'Haskell', category: 'languages' },
-  { word: 'Lua', category: 'languages' },
-  { word: 'R', category: 'languages' },
-  { word: 'React', category: 'frameworks' },
-  { word: 'Angular', category: 'frameworks' },
-  { word: 'Vue', category: 'frameworks' },
-  { word: 'Django', category: 'frameworks' },
-  { word: 'Flask', category: 'frameworks' },
-  { word: 'Node', category: 'frameworks' },
-  { word: 'Express', category: 'frameworks' },
-  { word: 'Spring', category: 'frameworks' },
-  { word: 'Rails', category: 'frameworks' },
-  { word: 'Svelte', category: 'frameworks' },
-  { word: 'Next', category: 'frameworks' },
-  { word: 'Redux', category: 'frameworks' },
-  { word: 'Tailwind', category: 'frameworks' },
-  { word: 'Webpack', category: 'frameworks' },
-  { word: 'Vite', category: 'frameworks' },
-  { word: 'PostgreSQL', category: 'databases' },
-  { word: 'MongoDB', category: 'databases' },
-  { word: 'Redis', category: 'databases' },
-  { word: 'MySQL', category: 'databases' },
-  { word: 'SQLite', category: 'databases' },
-  { word: 'Cassandra', category: 'databases' },
-  { word: 'DynamoDB', category: 'databases' },
-  { word: 'ElasticSearch', category: 'databases' },
-  { word: 'Firestore', category: 'databases' },
-  { word: 'Docker', category: 'devops' },
-  { word: 'Kubernetes', category: 'devops' },
-  { word: 'AWS', category: 'devops' },
-  { word: 'Azure', category: 'devops' },
-  { word: 'GCP', category: 'devops' },
-  { word: 'Terraform', category: 'devops' },
-  { word: 'Jenkins', category: 'devops' },
-  { word: 'GitLab', category: 'devops' },
-  { word: 'GitHub', category: 'devops' },
-  { word: 'CI', category: 'devops' },
-  { word: 'CD', category: 'devops' },
-  { word: 'Serverless', category: 'devops' },
-  { word: 'Lambda', category: 'devops' },
-  { word: 'Ansible', category: 'devops' },
-  { word: 'API', category: 'concepts' },
-  { word: 'REST', category: 'concepts' },
-  { word: 'Microservices', category: 'concepts' },
-  { word: 'Monolith', category: 'concepts' },
-  { word: 'Agile', category: 'concepts' },
-  { word: 'Scrum', category: 'concepts' },
-  { word: 'DevOps', category: 'concepts' },
-  { word: 'OOP', category: 'concepts' },
-  { word: 'Functional', category: 'concepts' },
-  { word: 'Reactive', category: 'concepts' },
-  { word: 'Git', category: 'vcs' },
-  { word: 'Commit', category: 'vcs' },
-  { word: 'Branch', category: 'vcs' },
-  { word: 'Merge', category: 'vcs' },
-  { word: 'Pull', category: 'vcs' },
-  { word: 'Fork', category: 'vcs' },
-  { word: 'Clone', category: 'vcs' },
-  { word: 'Rebase', category: 'vcs' },
-  { word: 'Tag', category: 'vcs' },
-  { word: 'Push', category: 'vcs' },
-  { word: 'Neural', category: 'ai' },
-  { word: 'Tensor', category: 'ai' },
-  { word: 'PyTorch', category: 'ai' },
-  { word: 'NLP', category: 'ai' },
-  { word: 'Vision', category: 'ai' },
-  { word: 'Transformer', category: 'ai' },
-  { word: 'GPT', category: 'ai' },
-  { word: 'LLM', category: 'ai' },
-  { word: 'Dataset', category: 'ai' },
-  { word: 'Training', category: 'ai' },
-  { word: 'OAuth', category: 'security' },
-  { word: 'JWT', category: 'security' },
-  { word: 'SSL', category: 'security' },
-  { word: 'Encryption', category: 'security' },
-  { word: 'Firewall', category: 'security' },
-  { word: 'VPN', category: 'security' },
-  { word: 'SSH', category: 'security' },
-  { word: 'TLS', category: 'security' },
-  { word: 'Linux', category: 'os' },
-  { word: 'Ubuntu', category: 'os' },
-  { word: 'Windows', category: 'os' },
-  { word: 'Nginx', category: 'os' },
-  { word: 'Apache', category: 'os' },
-  { word: 'iOS', category: 'mobile' },
-  { word: 'Android', category: 'mobile' },
-  { word: 'Flutter', category: 'mobile' },
-  { word: 'ReactNative', category: 'mobile' },
-  { word: 'SwiftUI', category: 'mobile' },
-  { word: 'Jest', category: 'testing' },
-  { word: 'Cypress', category: 'testing' },
-  { word: 'Selenium', category: 'testing' },
-  { word: 'JUnit', category: 'testing' },
-  { word: 'E2E', category: 'testing' },
-  { word: 'MVC', category: 'patterns' },
-  { word: 'Singleton', category: 'patterns' },
-  { word: 'Factory', category: 'patterns' },
-  { word: 'Observer', category: 'patterns' },
-  { word: 'Binary', category: 'misc' },
-  { word: 'Kernel', category: 'misc' },
-  { word: 'Socket', category: 'misc' },
-  { word: 'Cache', category: 'misc' },
-  { word: 'Router', category: 'misc' },
-  { word: 'Thread', category: 'misc' },
-  { word: 'Lambda', category: 'misc' },
-  { word: 'Process', category: 'misc' },
-];
-
-function getRandomWords(count: number = 25): string[] {
-  const shuffled = [...itWords].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count).map(w => w.word);
-}
-
-interface Card {
-  word: string;
-  color: 'red' | 'blue' | 'civilian' | 'assassin';
-  x: number;
-  y: number;
-  revealed: boolean;
-}
 
 interface GameState {
   cards: Card[];
   scores: { red: number; blue: number };
   remainingCards: { red: number; blue: number; civilian: number; assassin: number };
-  currentTurn: 'red' | 'blue';
+  currentTurn: TeamColor;
   status: 'playing' | 'finished';
   winner: TeamColor | null;
 }
 
-function createCardSet(): Card[] {
-  const words = getRandomWords(25);
-
-  const colors: Card['color'][] = [];
+function buildCards(entries: Array<{ word: string; picture: string }>): Card[] {
+  const colors: CardColor[] = [];
   for (let i = 0; i < 8; i++) colors.push('red');
   for (let i = 0; i < 8; i++) colors.push('blue');
   for (let i = 0; i < 8; i++) colors.push('civilian');
@@ -163,13 +28,9 @@ function createCardSet(): Card[] {
     [colors[i], colors[j]] = [colors[j], colors[i]];
   }
 
-  for (let i = words.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [words[i], words[j]] = [words[j], words[i]];
-  }
-
-  return words.map((word, index) => ({
-    word,
+  return entries.slice(0, 25).map((entry, index) => ({
+    word: entry.word,
+    picture: entry.picture,
     color: colors[index],
     x: index % 5,
     y: Math.floor(index / 5),
@@ -177,10 +38,10 @@ function createCardSet(): Card[] {
   }));
 }
 
-function createInitialGameState(): GameState {
+function createInitialGameState(cards: Card[]): GameState {
   const turn: TeamColor = Math.random() < 0.5 ? 'red' : 'blue';
   return {
-    cards: createCardSet(),
+    cards,
     scores: { red: 0, blue: 0 },
     remainingCards: { red: 8, blue: 8, civilian: 8, assassin: 1 },
     currentTurn: turn,
@@ -191,16 +52,41 @@ function createInitialGameState(): GameState {
 
 function DemoPage() {
   const navigate = useNavigate();
-  const [gameState, setGameState] = useState<GameState>(createInitialGameState);
+  const [theme, setTheme] = useState<ThemeId>('it');
+  const [deckKey, setDeckKey] = useState(0);
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [debugMode, setDebugMode] = useState(true);
   const [turnCount, setTurnCount] = useState(0);
 
+  useEffect(() => {
+    let cancelled = false;
+    setGameState(null);
+    setLoadError('');
+
+    api.dealTheme(theme)
+      .then((cards) => {
+        if (cancelled) return;
+        setGameState(createInitialGameState(buildCards(cards)));
+        setTurnCount(0);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить колоду');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [theme, deckKey]);
 
   const handleGuess = (cardIndex: number) => {
+    if (!gameState) return;
     const card = gameState.cards[cardIndex];
-    if (card.revealed || gameState.status === 'finished') return;
+    if (!card || card.revealed || gameState.status === 'finished') return;
 
     setGameState(prev => {
+      if (!prev) return prev;
       const picked = prev.cards[cardIndex];
       const cards = prev.cards.map((c, i) => (i === cardIndex ? { ...c, revealed: true } : c));
       const remaining = { ...prev.remainingCards };
@@ -226,9 +112,10 @@ function DemoPage() {
         remaining.civilian--;
         currentTurn = currentTurn === 'red' ? 'blue' : 'red';
       } else {
-        scores[picked.color]++;
-        remaining[picked.color]--;
-        if (remaining[picked.color] === 0) finish(picked.color);
+        const owner = picked.color;
+        scores[owner]++;
+        remaining[owner]--;
+        if (remaining[owner] === 0) finish(owner);
         else currentTurn = currentTurn === 'red' ? 'blue' : 'red';
       }
 
@@ -239,8 +126,7 @@ function DemoPage() {
   };
 
   const handleReset = () => {
-    setGameState(createInitialGameState());
-    setTurnCount(0);
+    setDeckKey(key => key + 1);
   };
 
   return (
@@ -251,7 +137,22 @@ function DemoPage() {
         </button>
 
         <h1>🧪 Демо-режим</h1>
-        <p className="demo-subtitle">Проверка работы игры без подключения к серверу</p>
+        <p className="demo-subtitle">Колода приходит с сервера, ходы считаются в браузере</p>
+      </div>
+
+      <div className="demo-themes" role="radiogroup" aria-label="Тема демо">
+        {THEMES.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="radio"
+            aria-checked={theme === item.id}
+            className={`theme-option ${theme === item.id ? 'selected' : ''}`}
+            onClick={() => setTheme(item.id)}
+          >
+            {item.title}
+          </button>
+        ))}
       </div>
 
       <div className="demo-controls">
@@ -266,82 +167,64 @@ function DemoPage() {
         </button>
       </div>
 
-      <div className="demo-stats">
-        <div className="stat-item">
-          <span className="stat-label">Ходов сделано:</span>
-          <span className="stat-value">{turnCount}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">Текущая команда:</span>
-          <span className={`stat-value team-${gameState.currentTurn}`}>
-            {gameState.currentTurn === 'red' ? '🔴 Красные' : '🔵 Синие'}
-          </span>
-        </div>
-      </div>
+      {loadError && <p className="demo-error">{loadError}</p>}
+      {!gameState && !loadError && <p className="demo-subtitle">Загрузка колоды...</p>}
 
-      <Scoreboard
-        scores={gameState.scores}
-        remaining={gameState.remainingCards}
-        currentTurn={gameState.currentTurn}
-      />
+      {gameState && (
+        <>
+          <div className="demo-stats">
+            <div className="stat-item">
+              <span className="stat-label">Ходов сделано:</span>
+              <span className="stat-value">{turnCount}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">Текущая команда:</span>
+              <span className={`stat-value team-${gameState.currentTurn}`}>
+                {gameState.currentTurn === 'red' ? '🔴 Красные' : '🔵 Синие'}
+              </span>
+            </div>
+          </div>
 
-      {gameState.status === 'finished' && (
-        <div className="game-finished">
-          <h2>🏆 Игра окончена!</h2>
-          {gameState.winner === 'red' ? (
-            <p className="winner-red">🔴 Красные победили!</p>
-          ) : gameState.winner === 'blue' ? (
-            <p className="winner-blue">🔵 Синие победили!</p>
-          ) : (
-            <p>Ничья!</p>
+          <Scoreboard
+            scores={gameState.scores}
+            remaining={gameState.remainingCards}
+            currentTurn={gameState.currentTurn}
+          />
+
+          {gameState.status === 'finished' && (
+            <div className="game-finished">
+              <h2>🏆 Игра окончена!</h2>
+              {gameState.winner === 'red' ? (
+                <p className="winner-red">🔴 Красные победили!</p>
+              ) : gameState.winner === 'blue' ? (
+                <p className="winner-blue">🔵 Синие победили!</p>
+              ) : (
+                <p>Ничья!</p>
+              )}
+              <button className="btn-play-again" onClick={handleReset}>
+                Начать новую игру
+              </button>
+            </div>
           )}
-          <button className="btn-play-again" onClick={handleReset}>
-            Начать новую игру
-          </button>
-        </div>
-      )}
 
-      <GameBoard
-        cards={gameState.cards}
-        onGuess={handleGuess}
-        disabled={gameState.status === 'finished'}
-        showAll={debugMode || gameState.status === 'finished'}
-      />
+          <GameBoard
+            cards={gameState.cards}
+            onGuess={handleGuess}
+            disabled={gameState.status === 'finished'}
+            showAll={debugMode || gameState.status === 'finished'}
+          />
+        </>
+      )}
 
       <div className="demo-info">
         <h3>📚 Как тестировать:</h3>
         <ul>
-          <li>✅ <strong>Показать все карточки</strong> — нажмите кнопку выше, чтобы увидеть цвета всех карточек</li>
-          <li>✅ <strong>Проверить логику</strong> — кликайте карточки и наблюдайте за изменениями</li>
-          <li>✅ <strong>Проверить победу</strong> — угадайте все 8 карточек своей команды</li>
-          <li>✅ <strong>Проверить поражение</strong> — кликните на 💀 Ассасин</li>
-          <li>✅ <strong>Проверить переход хода</strong> — кликните на карточку соперника или нейтральную</li>
+          <li>✅ <strong>Тема</strong> — переключите колоду сверху, раздача обновится</li>
+          <li>✅ <strong>Картинка</strong> — у каждого слова свой знак, цвет команды он не выдаёт</li>
+          <li>✅ <strong>Показать все карточки</strong> — цвета видны только в этом режиме</li>
+          <li>✅ <strong>Проверить победу</strong> — откройте все 8 карточек своей команды</li>
+          <li>✅ <strong>Проверить поражение</strong> — откройте 💀 Ассасина</li>
         </ul>
-
-        <h3>🎯 Ожидаемое поведение:</h3>
-        <div className="expected-grid">
-          <div className="expected-item expected-correct">
-            <span className="expected-icon">✅</span>
-            <div>
-              <strong>Своя карточка</strong>
-              <p>+1 очко, ход продолжается</p>
-            </div>
-          </div>
-          <div className="expected-item expected-wrong">
-            <span className="expected-icon">↪️</span>
-            <div>
-              <strong>Чужая карточка</strong>
-              <p>+1 сопернику, ход переходит. Последняя — его победа</p>
-            </div>
-          </div>
-          <div className="expected-item expected-lose">
-            <span className="expected-icon">💀</span>
-            <div>
-              <strong>Ассасин</strong>
-              <p>Мгновенное поражение</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

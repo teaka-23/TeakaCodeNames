@@ -42,8 +42,14 @@ CodeNames/
 │   │   ├── services/      # API & WebSocket clients
 │   │   └── types/         # TypeScript types
 │   └── package.json
+├── render.yaml            # Render Blueprint (API + static site)
+├── DEPLOY.md              # Render / Docker / VPS deploy guide
 └── README.md
 ```
+
+## Deployment
+
+Fastest path: push the repo and create a **Blueprint** from [`render.yaml`](./render.yaml) in the [Render Dashboard](https://dashboard.render.com/). Details and Free-plan caveats are in [`DEPLOY.md`](./DEPLOY.md).
 
 ## Installation
 

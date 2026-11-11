@@ -59,12 +59,14 @@ describe('itWords database', () => {
     expect(itWords.length).toBeGreaterThanOrEqual(150);
   });
 
-  it('should have all words with word and category', () => {
+  it('should have all words with word, category and a picture', () => {
     itWords.forEach(entry => {
       expect(entry.word).toBeDefined();
       expect(entry.category).toBeDefined();
       expect(typeof entry.word).toBe('string');
       expect(typeof entry.category).toBe('string');
+      expect(entry.picture).toBeTruthy();
+      expect(entry.picture).not.toBe('💻');
     });
   });
 

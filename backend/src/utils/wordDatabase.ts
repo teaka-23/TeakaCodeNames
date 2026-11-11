@@ -1,12 +1,16 @@
-// IT Technology themed words for Codenames
-// Words are organized by category for potential future use
+// IT Technology themed words for Codenames.
+// Picture glyphs illustrate the word itself and never encode the team color.
+
+import { IT_PICTURES } from '../themes/itPictures';
+import type { ThemeWord } from '../themes/types';
 
 export interface ITWord {
   word: string;
   category: string;
+  picture: string;
 }
 
-export const itWords: ITWord[] = [
+const itWordList: Array<Omit<ThemeWord, 'picture'>> = [
   // Programming Languages
   { word: 'JavaScript', category: 'languages' },
   { word: 'Python', category: 'languages' },
@@ -186,6 +190,11 @@ export const itWords: ITWord[] = [
   { word: 'Thread', category: 'misc' },
   { word: 'Process', category: 'misc' },
 ];
+
+export const itWords: ITWord[] = itWordList.map((entry) => ({
+  ...entry,
+  picture: IT_PICTURES[entry.word] ?? '💻',
+}));
 
 // Get random words for a game (25 words needed)
 export function getRandomWords(count: number = 25): string[] {

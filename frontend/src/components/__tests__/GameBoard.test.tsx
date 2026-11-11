@@ -75,11 +75,18 @@ describe('GameBoard', () => {
     expect(onGuess).not.toHaveBeenCalled();
   });
 
-  it('reveals the icon of a revealed card instead of its word', () => {
+  it('keeps the word on a revealed card and adds a color badge', () => {
     render(<GameBoard cards={mixedCards} onGuess={vi.fn()} disabled={false} />);
 
-    expect(screen.queryByText('Old')).not.toBeInTheDocument();
+    expect(screen.getByText('Old')).toBeInTheDocument();
     expect(screen.getAllByText('🔴')).toHaveLength(1);
+  });
+
+  it('shows the picture glyph for a card', () => {
+    const cards = [{ ...mixedCards[0], picture: '⚛️' }];
+    render(<GameBoard cards={cards} onGuess={vi.fn()} disabled={false} />);
+    expect(screen.getByText('⚛️')).toBeInTheDocument();
+    expect(screen.getByText('React')).toBeInTheDocument();
   });
 
   it('counts revealed cards in the legend', () => {

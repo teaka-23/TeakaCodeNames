@@ -6,6 +6,13 @@ function getWsBase(): string {
   const explicit = import.meta.env.VITE_WS_URL as string | undefined;
   if (explicit) return explicit;
 
+  const backend = import.meta.env.VITE_BACKEND_URL as string | undefined;
+  if (backend && /^https?:\/\//i.test(backend)) {
+    const url = new URL(backend);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${url.protocol}//${url.host}/ws`;
+  }
+
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}/ws`;
 }

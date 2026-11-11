@@ -38,6 +38,3 @@ data/
 
 # Docker
 .docker/
-
-# Deploy
-DEPLOY.md

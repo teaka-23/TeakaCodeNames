@@ -10,6 +10,8 @@ import type { GameState, Player, Card, WsMessage } from '../src/types';
  * are exercised end to end rather than mocked.
  */
 
+process.env.EMPTY_ROOM_GRACE_MS = '30';
+
 // The handler keeps a module-level singleton, so each suite gets a fresh registry.
 jest.mock('../src/utils/roomManager', () => {
   const actual = jest.requireActual('../src/utils/roomManager');
@@ -255,16 +257,45 @@ describe('WebSocket start_round', () => {
       .toEqual({ word: 'сеть', count: 8 });
   });
 
-  it('generates a clue when none is provided', async () => {
+  it('ignores start_round without a clue word', async () => {
     room = buildStartedRoom();
     const spymaster = room.gameState.players.find((p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn)!;
     const socket = await openSynced(room.id, spymaster.id, room.token);
 
     socket.send('start_round', {});
+    const messages = await socket.drain();
 
-    const state = (await socket.next('game_update')).payload as GameState;
-    expect(state.clues).not.toBeNull();
-    expect(typeof state.clues!.word).toBe('string');
+    expect(messages.some(m => m.type === 'start_round')).toBe(false);
+    expect(room.gameState.clues).toBeNull();
+    expect(room.gameState.status).toBe('spymaster-ready');
+  });
+
+  it('rejects a clue that matches a board word', async () => {
+    room = buildStartedRoom();
+    const spymaster = room.gameState.players.find((p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn)!;
+    const socket = await openSynced(room.id, spymaster.id, room.token);
+    const boardWord = room.gameState.cards[0].word;
+
+    socket.send('start_round', { clue: { word: boardWord, count: 1 } });
+    const messages = await socket.drain();
+
+    expect(messages.some(m => m.type === 'start_round')).toBe(false);
+    expect(room.gameState.clues).toBeNull();
+  });
+
+  it('keeps clue history after the turn passes', async () => {
+    room = buildStartedRoom();
+    const spymaster = room.gameState.players.find((p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn)!;
+    const socket = await openSynced(room.id, spymaster.id, room.token);
+
+    socket.send('start_round', { clue: { word: 'архив', count: 2 } });
+    await socket.next('game_update');
+    roomManager.passTurn(room.id);
+
+    expect(room.gameState.clues).toBeNull();
+    expect(room.gameState.clueHistory).toEqual([
+      { word: 'архив', count: 2, team: spymaster.team },
+    ]);
   });
 
   it('ignores start_round from a non-spymaster', async () => {
@@ -424,7 +455,7 @@ describe('WebSocket disconnection', () => {
     const socket = await openSynced(roomId, 'p1', room.token);
 
     await socket.close();
-    await sleep(80);
+    await sleep(120);
 
     expect(roomManager.get(roomId)).toBeUndefined();
   });
@@ -470,12 +501,15 @@ describe('Spectator mode', () => {
   });
 
   it('never assigns the spymaster role to a spectator', () => {
-    room = buildStartedRoom();
-    roomManager.join(room.id, 'Зритель', 'spec1', true);
-    roomManager.start(room.id);
+    const r = roomManager.create('Алиса', 'p1');
+    roomManager.join(r.id, 'Боб', 'p2');
+    roomManager.join(r.id, 'Виктор', 'p3');
+    roomManager.join(r.id, 'Зритель', 'spec1', true);
+    roomManager.start(r.id);
 
-    const spectator = room.gameState.players.find((p: Player) => p.id === 'spec1')!;
+    const spectator = r.gameState.players.find((p: Player) => p.id === 'spec1')!;
     expect(spectator.role).toBe('spectator');
+    expect(r.gameState.players.filter((p: Player) => p.role === 'spymaster')).toHaveLength(2);
   });
 
   it('lets a spectator connect and receive the board', async () => {

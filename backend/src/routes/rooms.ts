@@ -2,11 +2,14 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { roomManager } from '../utils/roomManager';
+import { dealEntries, isThemeId, THEME_META } from '../themes';
+import { broadcastRoomState } from '../utils/webSocketHandler';
 
 const router = Router();
 
 const CreateRoomSchema = z.object({
   playerName: z.string().trim().min(1).max(20),
+  theme: z.enum(['it', 'football', 'yoga', 'movies']).optional(),
 });
 
 const JoinRoomSchema = z.object({
@@ -14,17 +17,26 @@ const JoinRoomSchema = z.object({
   spectate: z.boolean().optional(),
 });
 
+const ClaimSeatSchema = z.object({
+  playerId: z.string().trim().min(1),
+  team: z.enum(['red', 'blue']),
+  role: z.enum(['spymaster', 'guesser']),
+});
+
 // POST /api/rooms - Create new room
 router.post('/rooms', (req: Request, res: Response) => {
   const parsed = CreateRoomSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Некорректное имя игрока (1-20 символов)' });
+    const themeIssue = parsed.error.issues.some((issue) => issue.path[0] === 'theme');
+    res.status(400).json({
+      error: themeIssue ? 'Неизвестная тема' : 'Некорректное имя игрока (1-20 символов)',
+    });
     return;
   }
 
   try {
     const playerId = randomUUID().slice(0, 8);
-    const room = roomManager.create(parsed.data.playerName, playerId);
+    const room = roomManager.create(parsed.data.playerName, playerId, parsed.data.theme ?? 'it');
 
     res.json({
       roomId: room.id,
@@ -115,10 +127,55 @@ router.get('/rooms/:roomId/token', (req: Request, res: Response) => {
   res.json({ token: room.token });
 });
 
+// POST /api/rooms/:roomId/claim-seat - Sit as spymaster/guesser on a team
+router.post('/rooms/:roomId/claim-seat', (req: Request, res: Response) => {
+  const parsed = ClaimSeatSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Некорректное место' });
+    return;
+  }
+
+  try {
+    const roomId = String(req.params.roomId).toUpperCase();
+    const room = roomManager.claimSeat(
+      roomId,
+      parsed.data.playerId,
+      parsed.data.team,
+      parsed.data.role
+    );
+    broadcastRoomState(roomId);
+    res.json({ gameState: room.gameState });
+  } catch (error) {
+    if (error instanceof Error) {
+      switch (error.message) {
+        case 'Room not found':
+          res.status(404).json({ error: 'Комната не найдена' });
+          return;
+        case 'Player not found':
+          res.status(404).json({ error: 'Игрок не найден' });
+          return;
+        case 'Game already started':
+          res.status(400).json({ error: 'Игра уже началась' });
+          return;
+        case 'Room is full':
+          res.status(400).json({ error: 'Комната заполнена' });
+          return;
+        case 'Team is full':
+          res.status(400).json({ error: 'В команде уже 3 игрока' });
+          return;
+      }
+    }
+    console.error('Error claiming seat:', error);
+    res.status(500).json({ error: 'Не удалось занять место' });
+  }
+});
+
 // POST /api/rooms/:roomId/start - Start the game
 router.post('/rooms/:roomId/start', (req: Request, res: Response) => {
   try {
-    const room = roomManager.start(String(req.params.roomId).toUpperCase());
+    const roomId = String(req.params.roomId).toUpperCase();
+    const room = roomManager.start(roomId);
+    broadcastRoomState(roomId);
     res.json({ gameState: room.gameState });
   } catch (error) {
     if (error instanceof Error) {
@@ -128,6 +185,12 @@ router.post('/rooms/:roomId/start', (req: Request, res: Response) => {
           return;
         case 'Need at least 3 players to start':
           res.status(400).json({ error: 'Нужно минимум 3 игрока' });
+          return;
+        case 'Both teams need at least one player':
+          res.status(400).json({ error: 'Нужны игроки в обеих командах' });
+          return;
+        case 'Game already started':
+          res.status(400).json({ error: 'Игра уже началась' });
           return;
       }
     }
@@ -148,6 +211,26 @@ router.delete('/rooms/:roomId', (req: Request, res: Response) => {
 
   roomManager.delete(roomId);
   res.json({ message: 'Комната удалена' });
+});
+
+// GET /api/themes - Themes a host can choose before the deal
+router.get('/themes', (_req: Request, res: Response) => {
+  res.json({ themes: THEME_META });
+});
+
+// GET /api/themes/:theme/deal - 25 pictured words for the offline-feel demo
+router.get('/themes/:theme/deal', (req: Request, res: Response) => {
+  const theme = String(req.params.theme);
+  if (!isThemeId(theme)) {
+    res.status(400).json({ error: 'Неизвестная тема' });
+    return;
+  }
+
+  const cards = dealEntries(theme, 25).map((entry) => ({
+    word: entry.word,
+    picture: entry.picture,
+  }));
+  res.json({ theme, cards });
 });
 
 // GET /api/rooms - List active rooms

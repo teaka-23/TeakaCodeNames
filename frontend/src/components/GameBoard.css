@@ -9,21 +9,44 @@
 }
 
 .game-card {
-  aspect-ratio: 1.5;
+  position: relative;
+  aspect-ratio: 0.92;
   border: 2px solid #444;
   border-radius: 8px;
-  padding: 0.5rem;
+  padding: 0.35rem 0.35rem 0.4rem;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: #fff;
   transition: all 0.2s ease;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.card-picture {
+  flex: 1;
+  width: 100%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  line-height: 1.2;
+  font-size: clamp(1.15rem, 2.5vw, 1.85rem);
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+}
+
+.card-badge {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 .game-card:not(.revealed):hover:not(:disabled) {

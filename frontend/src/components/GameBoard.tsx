@@ -60,7 +60,6 @@ function GameBoard({ cards, onGuess, disabled, showAll }: GameBoardProps) {
           // Guessers must not learn a color from the paint. Color is visible
           // only after a reveal, or when showAll is set (spymaster, spectator, game over).
           const exposed = card.revealed || Boolean(showAll);
-          const label = showAll ? card.word : card.revealed ? cardIcon(card.color) : card.word;
 
           return (
             <button
@@ -74,13 +73,15 @@ function GameBoard({ cards, onGuess, disabled, showAll }: GameBoardProps) {
                     ? revealedColor(card.color)
                     : faceColor(card.color),
                 borderColor: exposed ? borderColor(card.color) : '#444',
-                opacity: card.revealed ? 0.7 : 1,
+                opacity: card.revealed ? 0.85 : 1,
                 cursor: disabled || card.revealed ? 'not-allowed' : 'pointer',
               }}
               onClick={() => !disabled && !card.revealed && onGuess(index)}
               disabled={disabled || card.revealed}
             >
-              <span className="card-word">{label}</span>
+              <span className="card-picture" aria-hidden="true">{card.picture || '🂠'}</span>
+              <span className="card-word">{card.word}</span>
+              {card.revealed && <span className="card-badge">{cardIcon(card.color)}</span>}
             </button>
           );
         })}

@@ -1,3 +1,4 @@
+export type ThemeId = 'it' | 'football' | 'yoga' | 'movies';
 export type TeamColor = 'red' | 'blue';
 export type CardColor = TeamColor | 'civilian' | 'assassin';
 export type GameStatus = 'waiting' | 'spymaster-ready' | 'playing' | 'finished';
@@ -12,14 +13,23 @@ export interface Player {
 
 export interface Card {
   word: string;
+  /** Glyph that illustrates the word. It does not reveal the card color. */
+  picture: string;
   color: CardColor;
   x: number;
   y: number;
   revealed: boolean;
 }
 
+export interface ClueEntry {
+  word: string;
+  count: number;
+  team: TeamColor;
+}
+
 export interface GameState {
   roomId: string;
+  theme: ThemeId;
   status: GameStatus;
   players: Player[];
   cards: Card[];
@@ -28,6 +38,8 @@ export interface GameState {
     word: string;
     count: number;
   } | null;
+  /** Every clue given this match, newest last. Survives turn changes. */
+  clueHistory: ClueEntry[];
   scores: {
     red: number;
     blue: number;

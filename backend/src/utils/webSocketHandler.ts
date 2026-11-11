@@ -12,15 +12,18 @@ import {
   StartRoundMessage,
 } from '../types';
 import { roomManager, GameRoom } from '../utils/roomManager';
-import { generateClue } from '../utils/gameLogic';
+
+/** Delay before wiping a room with no open sockets. Override in tests. */
+export const EMPTY_ROOM_GRACE_MS = Number(process.env.EMPTY_ROOM_GRACE_MS) || 60_000;
 
 /**
  * Attach the game socket at `/ws?roomId&playerId&token`.
  *
  * The room token is checked on connect. After that the server accepts
- * `guess`, `skip_turn` and `start_round`, and answers with `guess_result`,
- * `start_round`, `turn_expired`, `player_list` and a full `game_update`.
- * One room shares a single token, so the payload is the same for every client.
+ * `guess`, `skip_turn`, `start_round` and `claim_seat`, and answers with
+ * `guess_result`, `start_round`, `turn_expired`, `player_list` and a full
+ * `game_update`. One room shares a single token, so the payload is the same
+ * for every client.
  */
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ server, path: '/ws' });
@@ -86,7 +89,13 @@ export function setupWebSocket(server: Server) {
       room.playerConnections.delete(playerId);
 
       if (room.playerConnections.size === 0) {
-        roomManager.delete(roomId);
+        // Brief reconnects and lobby↔room navigations must not wipe an empty room.
+        setTimeout(() => {
+          const current = roomManager.get(roomId);
+          if (current && current.playerConnections.size === 0) {
+            roomManager.delete(roomId);
+          }
+        }, EMPTY_ROOM_GRACE_MS).unref?.();
       } else {
         broadcastToRoom(room, {
           type: 'player_list',
@@ -104,6 +113,16 @@ export function setupWebSocket(server: Server) {
   console.log('WebSocket server initialized');
 }
 
+/** Push the current room state to every open socket (used after REST start). */
+export function broadcastRoomState(roomId: string): void {
+  const room = roomManager.get(roomId);
+  if (!room) return;
+  broadcastToRoom(room, {
+    type: 'game_update',
+    payload: room.gameState,
+  } as GameUpdateMessage);
+}
+
 function handleWebSocketMessage(room: GameRoom, playerId: string, message: WsMessage) {
   switch (message.type) {
     case 'guess':
@@ -115,8 +134,30 @@ function handleWebSocketMessage(room: GameRoom, playerId: string, message: WsMes
     case 'start_round':
       handleStartRound(room, playerId, message);
       break;
+    case 'claim_seat':
+      handleClaimSeat(room, playerId, message);
+      break;
     default:
       console.log('Unknown message type:', message.type);
+  }
+}
+
+function handleClaimSeat(room: GameRoom, playerId: string, message: WsMessage) {
+  const payload = message.payload as { team?: unknown; role?: unknown } | undefined;
+  const team = payload?.team;
+  const role = payload?.role;
+  if ((team !== 'red' && team !== 'blue') || (role !== 'spymaster' && role !== 'guesser')) {
+    return;
+  }
+
+  try {
+    roomManager.claimSeat(room.id, playerId, team, role);
+    broadcastToRoom(room, {
+      type: 'game_update',
+      payload: room.gameState,
+    } as GameUpdateMessage);
+  } catch (error) {
+    console.error('Error claiming seat:', error);
   }
 }
 
@@ -203,28 +244,46 @@ function expireTurnIfNeeded(room: GameRoom): boolean {
   return true;
 }
 
+function normalizeClueWord(word: string): string {
+  return word.trim().toLocaleLowerCase('ru-RU');
+}
+
 function handleStartRound(room: GameRoom, playerId: string, message?: WsMessage) {
   const player = room.gameState.players.find((p: Player) => p.id === playerId);
   if (!player || player.role !== 'spymaster' || player.team !== room.gameState.currentTurn) {
     return;
   }
 
-  // Prefer the manually entered clue from the spymaster; fall back to a generated one
-  const provided = (message?.payload as { clue?: { word?: unknown; count?: unknown } } | undefined)?.clue;
-  let clueWord: string;
-  let count: number;
+  if (room.gameState.status !== 'spymaster-ready') {
+    return;
+  }
 
-  if (provided && typeof provided.word === 'string' && provided.word.trim()) {
-    clueWord = provided.word.trim().slice(0, 30);
-    const rawCount = Number(provided.count);
-    count = Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 8) : 1;
-  } else {
-    const generated = generateClue(room.gameState.cards, room.gameState.currentTurn);
-    clueWord = generated.word;
-    count = generated.count;
+  const provided = (message?.payload as { clue?: { word?: unknown; count?: unknown } } | undefined)?.clue;
+  if (!provided || typeof provided.word !== 'string' || !provided.word.trim()) {
+    return;
+  }
+
+  const clueWord = provided.word.trim().slice(0, 30);
+  const rawCount = Number(provided.count);
+  const count = Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 8) : 1;
+
+  const normalized = normalizeClueWord(clueWord);
+  const matchesBoard = room.gameState.cards.some(
+    (card) => normalizeClueWord(card.word) === normalized
+  );
+  if (matchesBoard) {
+    return;
   }
 
   room.gameState.clues = { word: clueWord, count };
+  if (!room.gameState.clueHistory) {
+    room.gameState.clueHistory = [];
+  }
+  room.gameState.clueHistory.push({
+    word: clueWord,
+    count,
+    team: room.gameState.currentTurn,
+  });
   room.gameState.status = 'playing';
   roomManager.startTurnClock(room.id);
 
@@ -236,11 +295,7 @@ function handleStartRound(room: GameRoom, playerId: string, message?: WsMessage)
     },
   };
 
-  const spymasterWs = room.playerConnections.get(playerId);
-  if (spymasterWs && spymasterWs.readyState === WebSocket.OPEN) {
-    sendToPlayer(spymasterWs, startRoundMsg);
-  }
-
+  broadcastToRoom(room, startRoundMsg);
   broadcastToRoom(room, {
     type: 'game_update',
     payload: room.gameState,

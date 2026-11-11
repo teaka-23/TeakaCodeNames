@@ -14,6 +14,7 @@ describe('createGameState', () => {
     expect(gameState.players).toEqual([]);
     expect(gameState.cards).toEqual([]);
     expect(gameState.clues).toBeNull();
+    expect(gameState.clueHistory).toEqual([]);
     expect(gameState.scores).toEqual({ red: 0, blue: 0 });
     expect(gameState.remainingCards).toEqual({
       red: 8,
@@ -63,6 +64,11 @@ describe('generateCards', () => {
       expect(card.x).toBe(index % 5);
       expect(card.y).toBe(Math.floor(index / 5));
     });
+  });
+
+  it('should attach a picture to every card', () => {
+    const cards = generateCards();
+    expect(cards.every(card => card.picture.length > 0)).toBe(true);
   });
 
   it('should mark all cards as unrevealed initially', () => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { THEMES, type ThemeId } from '../data/themes';
 import './LobbyPage.css';
 
 const SESSION_KEY = 'codenames_session';
@@ -10,6 +11,7 @@ function LobbyPage() {
   const [playerName, setPlayerName] = useState('');
   const [roomId, setRoomId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [theme, setTheme] = useState<ThemeId>('it');
   const [error, setError] = useState('');
   const [createdRoom, setCreatedRoom] = useState<{ roomId: string; playerId: string } | null>(null);
 
@@ -23,7 +25,7 @@ function LobbyPage() {
     setError('');
 
     try {
-      const response = await api.createRoom(playerName.trim());
+      const response = await api.createRoom(playerName.trim(), theme);
       localStorage.setItem(SESSION_KEY, JSON.stringify({
         roomId: response.roomId,
         playerId: response.playerId,
@@ -69,17 +71,27 @@ function LobbyPage() {
     }
   };
 
+  const roomLink = createdRoom
+    ? `${window.location.origin}/room/${createdRoom.roomId}`
+    : '';
+
   const copyRoomCode = () => {
     if (createdRoom) {
       navigator.clipboard.writeText(createdRoom.roomId);
     }
   };
 
+  const copyRoomLink = () => {
+    if (roomLink) {
+      navigator.clipboard.writeText(roomLink);
+    }
+  };
+
   return (
     <div className="lobby-container">
       <div className="app-header">
-        <h1>🕵️ Codenames IT</h1>
-        <p>Командная игра на ассоциации с IT-тематикой</p>
+        <h1>🕵️ Codenames</h1>
+        <p>Командная игра на ассоциации. Тему выбирает создатель комнаты.</p>
       </div>
 
       <div className="lobby-card">
@@ -93,6 +105,25 @@ function LobbyPage() {
               placeholder="Введите имя..."
               maxLength={20}
             />
+          </div>
+
+          <div className="form-group">
+            <label>Тема колоды</label>
+            <div className="theme-grid" role="radiogroup" aria-label="Тема колоды">
+              {THEMES.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={theme === item.id}
+                  className={`theme-option ${theme === item.id ? 'selected' : ''}`}
+                  onClick={() => setTheme(item.id)}
+                >
+                  <span className="theme-title">{item.title}</span>
+                  <span className="theme-blurb">{item.blurb}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="actions">
@@ -138,12 +169,16 @@ function LobbyPage() {
         {createdRoom && (
           <div className="room-created">
             <h3>Комната создана!</h3>
-            <p>Поделитесь этим кодом с друзьями:</p>
+            <p>Тема: {THEMES.find((item) => item.id === theme)?.title}. Поделитесь кодом или ссылкой:</p>
             <div className="room-code" onClick={copyRoomCode}>
               <span>{createdRoom.roomId}</span>
-              <button className="copy-btn">Копировать</button>
+              <button type="button" className="copy-btn">Копировать код</button>
             </div>
-            <p className="hint">Нажмите на код, чтобы скопировать</p>
+            <div className="room-link" onClick={copyRoomLink}>
+              <span>{roomLink}</span>
+              <button type="button" className="copy-btn">Копировать ссылку</button>
+            </div>
+            <p className="hint">Друзья откроют ссылку или введут код в лобби</p>
             <button
               className="btn-wait"
               onClick={() => navigate(`/room/${createdRoom.roomId}`)}

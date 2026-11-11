@@ -13,7 +13,12 @@ const base = `http://localhost:${PORT}/api`;
 const wsBase = `ws://localhost:${PORT}/ws`;
 
 const server = spawn(process.execPath, ['dist/server.js'], {
-  env: { ...process.env, PORT: String(PORT), PERSISTENCE_DRIVER: 'memory' },
+  env: {
+    ...process.env,
+    PORT: String(PORT),
+    PERSISTENCE_DRIVER: 'memory',
+    EMPTY_ROOM_GRACE_MS: '50',
+  },
   stdio: ['ignore', 'pipe', 'inherit'],
 });
 
@@ -213,7 +218,7 @@ try {
   check('room exists while players connected', (await api('GET', `/rooms/${roomId}`)).status === 200);
 
   for (const c of clients.values()) c.ws.close();
-  await delay(500);
+  await delay(200);
   check('room deleted after all players disconnect', (await api('GET', `/rooms/${roomId}`)).status === 404);
 
   console.log(`\n${passed} passed, ${failed} failed`);

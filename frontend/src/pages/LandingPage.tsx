@@ -12,10 +12,10 @@ function LandingPage() {
       <section className="landing-hero">
         <div className="hero-content">
           <h1 className="hero-title">
-            🕵️ <span className="gradient-text">Codenames</span> IT
+            🕵️ <span className="gradient-text">Codenames</span>
           </h1>
           <p className="hero-subtitle">
-            Командная игра на ассоциации с IT-тематикой
+            Командная игра на ассоциации: IT, футбол, йога или фильмы
           </p>
           <div className="hero-actions">
             <button className="btn-primary" onClick={() => scrollToSection('rules')}>
@@ -31,9 +31,16 @@ function LandingPage() {
         </div>
         <div className="hero-visual">
           <div className="sample-grid">
-            {['React', 'Python', 'Docker', 'Git', 'AWS'].map((word, i) => (
-              <div key={i} className="sample-card">
-                {word}
+            {[
+              ['⚛️', 'React'],
+              ['⚽', 'Пенальти'],
+              ['🧘', 'Лотос'],
+              ['🎬', 'Кадр'],
+              ['🐳', 'Docker'],
+            ].map(([picture, word]) => (
+              <div key={word} className="sample-card">
+                <span className="sample-picture">{picture}</span>
+                <span>{word}</span>
               </div>
             ))}
           </div>
