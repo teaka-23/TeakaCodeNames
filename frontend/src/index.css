@@ -1,0 +1,27 @@
+:root {
+  --team-red: #dc3545;
+  --team-blue: #0d6efd;
+  --card-revealed-red: #c82333;
+  --card-revealed-blue: #0b5ed5;
+  --card-civilian: #6c757d;
+  --card-assassin: #212529;
+}
+
+body {
+  background-color: #1a1a2e;
+  color: #e0e0e0;
+  min-height: 100vh;
+}
+
+.card {
+  background: transparent;
+  border: none;
+}
+
+.team-red {
+  color: var(--team-red);
+}
+
+.team-blue {
+  color: var(--team-blue);
+}

@@ -1,0 +1,25 @@
+{
+  "name": "codenames-it",
+  "version": "1.0.0",
+  "description": "IT-themed multiplayer Codenames game",
+  "scripts": {
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "install-all": "cd backend && npm install && cd ../frontend && npm install",
+    "test": "cd backend && npm test && cd ../frontend && npm test",
+    "test:e2e": "cd backend && npm run test:e2e",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "deploy:build": "cd backend && npm run build && cd ../frontend && npm run build && cd ..",
+    "deploy:docker": "docker compose up -d --build"
+  },
+  "keywords": ["codenames", "game", "multiplayer"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

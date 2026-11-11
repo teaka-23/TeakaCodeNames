@@ -1,0 +1,72 @@
+.turn-timer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+  padding: 0.6rem 1rem;
+  background: #16213e;
+  border: 2px solid #2a2a4a;
+  border-radius: 10px;
+  color: #ddd;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.turn-timer.team-red {
+  border-color: rgba(220, 53, 69, 0.45);
+}
+
+.turn-timer.team-blue {
+  border-color: rgba(13, 110, 253, 0.45);
+}
+
+.turn-timer.urgent {
+  background: rgba(220, 53, 69, 0.15);
+  border-color: #dc3545;
+  animation: timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  50% {
+    background: rgba(220, 53, 69, 0.3);
+  }
+}
+
+.timer-icon {
+  font-size: 1.1rem;
+}
+
+.timer-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+  text-align: right;
+}
+
+.turn-timer.urgent .timer-value {
+  color: #ff6b6b;
+}
+
+.timer-label {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.timer-bar {
+  flex: 1 1 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.timer-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4ade80, #fbbf24);
+  transition: width 0.25s linear;
+}
+
+.turn-timer.urgent .timer-bar-fill {
+  background: linear-gradient(90deg, #fbbf24, #dc3545);
+}

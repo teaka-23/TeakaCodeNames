@@ -1,0 +1,236 @@
+.lobby-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.lobby-card {
+  background: #16213e;
+  border-radius: 16px;
+  padding: 2.5rem;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.input-section {
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #aaa;
+}
+
+.form-group input,
+.room-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.room-input:focus {
+  outline: none;
+  border-color: #533483;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.btn-create,
+.btn-join {
+  flex: 1;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+}
+
+.btn-create:active,
+.btn-join:active {
+  transform: scale(0.98);
+}
+
+.btn-create {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  color: white;
+}
+
+.btn-create:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e44455 0%, #d32f3f 100%);
+}
+
+.btn-join {
+  background: linear-gradient(135deg, #0d6efd 0%, #0b5ed5 100%);
+  color: white;
+}
+
+.btn-join:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1e7ae4 0%, #0d6efd 100%);
+}
+
+.btn-create:disabled,
+.btn-join:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.join-input {
+  margin-top: 1rem;
+}
+
+.error-message {
+  color: #ff6b6b;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.join-input {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.join-input .room-input {
+  flex: 1;
+}
+
+.btn-spectate {
+  padding: 0.875rem 1.25rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid #444;
+  color: #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-spectate:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: #666;
+}
+
+.btn-spectate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.room-created {
+  text-align: center;
+  padding: 2rem;
+  background: #0f3460;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.room-created h3 {
+  color: #4ade80;
+  margin-bottom: 1rem;
+}
+
+.room-created p {
+  color: #aaa;
+  margin-bottom: 0.75rem;
+}
+
+.room-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #16213e;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  margin: 1rem 0;
+}
+
+.room-code span {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.25rem;
+  color: #fff;
+}
+
+.copy-btn {
+  background: #533483;
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.copy-btn:hover {
+  background: #6b44a8;
+}
+
+.hint {
+  font-size: 0.8rem !important;
+  color: #666 !important;
+}
+
+.btn-wait {
+  width: 100%;
+  padding: 1rem;
+  background: #4ade80;
+  color: #16213e;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.btn-wait:hover {
+  background: #5ee89a;
+}
+
+.how-to-play {
+  border-top: 1px solid #2a2a4a;
+  padding-top: 1.5rem;
+}
+
+.how-to-play h4 {
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.how-to-play ul {
+  list-style: none;
+  padding: 0;
+}
+
+.how-to-play li {
+  padding: 0.5rem 0;
+  color: #aaa;
+  font-size: 0.95rem;
+}

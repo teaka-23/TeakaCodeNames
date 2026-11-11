@@ -1,0 +1,138 @@
+.clue-display {
+  margin: 1rem 0;
+  padding: 1rem;
+}
+
+.clue-prompt {
+  text-align: center;
+  padding: 1.5rem;
+  background: #16213e;
+  border-radius: 12px;
+}
+
+.clue-prompt p {
+  color: #aaa;
+  margin-bottom: 1rem;
+}
+
+.btn-get-clue {
+  padding: 0.875rem 2rem;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #1a1a2e;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.btn-get-clue:hover {
+  transform: scale(1.02);
+}
+
+.btn-get-clue:active {
+  transform: scale(0.98);
+}
+
+.clue-card {
+  background: #16213e;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  border: 2px solid;
+}
+
+.clue-display.team-red .clue-card {
+  border-color: rgba(220, 53, 69, 0.4);
+}
+
+.clue-display.team-blue .clue-card {
+  border-color: rgba(13, 110, 253, 0.4);
+}
+
+.clue-team {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin-bottom: 1rem;
+}
+
+.clue-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.clue-word {
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.clue-display.team-red .clue-word {
+  color: #ff6b6b;
+}
+
+.clue-display.team-blue .clue-word {
+  color: #6bb5ff;
+}
+
+.clue-count {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #fbbf24;
+  padding: 0.5rem 1rem;
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 8px;
+}
+
+.clue-instruction {
+  color: #888;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.clue-form {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.clue-form input[type='text'] {
+  flex: 1 1 200px;
+  max-width: 260px;
+  padding: 0.75rem 1rem;
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.clue-form input[type='number'] {
+  width: 70px;
+  padding: 0.75rem 0.5rem;
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.clue-form input:focus {
+  outline: none;
+  border-color: #533483;
+}
+
+.clue-error {
+  margin-top: 0.75rem;
+  color: #ff6b6b;
+  font-size: 0.9rem;
+}

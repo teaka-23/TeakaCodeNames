@@ -1,0 +1,337 @@
+.game-loading,
+.game-join {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #2a2a4a;
+  border-top-color: #533483;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.join-card {
+  background: #16213e;
+  border-radius: 16px;
+  padding: 2.5rem;
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.join-card h2 {
+  color: #fff;
+  margin-bottom: 0.5rem;
+}
+
+.join-card p {
+  color: #aaa;
+  margin-bottom: 1.5rem;
+}
+
+.join-input input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: #0f3460;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.join-input input:focus {
+  outline: none;
+  border-color: #533483;
+}
+
+.btn-join-game {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+  color: #16213e;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-join-game:hover {
+  background: linear-gradient(135deg, #5ee89a 0%, #4ade80 100%);
+}
+
+.error {
+  color: #ff6b6b;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 8px;
+}
+
+.game-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.btn-back {
+  background: transparent;
+  border: 1px solid #444;
+  color: #aaa;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  border-color: #666;
+  color: #fff;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.team-badge {
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.spymaster-badge {
+  font-size: 0.875rem;
+  color: #fbbf24;
+}
+
+.game-over {
+  text-align: center;
+  padding: 3rem;
+  background: #16213e;
+  border-radius: 16px;
+  margin: 2rem 0;
+}
+
+.game-over h2 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.game-over p {
+  font-size: 1.25rem;
+  color: #aaa;
+  margin-bottom: 2rem;
+}
+
+.btn-play-again {
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+  color: #16213e;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-skip {
+  display: block;
+  margin: 1rem auto;
+  padding: 0.75rem 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #444;
+  color: #aaa;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-skip:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.player-list {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #16213e;
+  border-radius: 12px;
+}
+
+.player-list h4 {
+  color: #aaa;
+  margin-bottom: 1rem;
+}
+
+.players-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.player-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.player-role {
+  font-size: 0.8rem;
+}
+
+.player-name {
+  color: #ddd;
+  font-size: 0.9rem;
+}
+
+.join-hint {
+  margin-top: 1rem;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.spymaster-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 8px;
+  color: #fbbf24;
+  font-size: 0.9rem;
+}
+
+.spectator-badge {
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+}
+
+.spectator-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.toast-notification {
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 1rem 1.75rem;
+  background: #16213e;
+  border: 1px solid #533483;
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  animation: toast-in 0.25s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Debug Panel */
+.debug-panel {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #0f3460;
+  border-radius: 12px;
+  border: 2px dashed #533483;
+}
+
+.btn-debug {
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: rgba(83, 52, 131, 0.3);
+  border: 2px solid #533483;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-debug:hover {
+  background: rgba(83, 52, 131, 0.5);
+}
+
+.btn-debug.active {
+  background: rgba(83, 52, 131, 0.7);
+  border-color: #7c3aed;
+}
+
+.debug-controls {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.debug-controls button {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid #444;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.debug-controls button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.debug-hint {
+  font-size: 0.85rem;
+  color: #aaa;
+  font-style: italic;
+  margin-top: 0.5rem;
+}

@@ -1,0 +1,81 @@
+.scoreboard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 1rem;
+  background: #16213e;
+  border-radius: 12px;
+  margin-bottom: 1rem;
+}
+
+.team-score {
+  text-align: center;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  min-width: 140px;
+  transition: all 0.3s ease;
+}
+
+.team-score.active {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+}
+
+.team-score.team-red.active {
+  border: 1px solid rgba(220, 53, 69, 0.5);
+}
+
+.team-score.team-blue.active {
+  border: 1px solid rgba(13, 110, 253, 0.5);
+}
+
+.score-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.team-icon {
+  font-size: 1.2rem;
+}
+
+.team-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.turn-indicator {
+  font-size: 0.8rem;
+}
+
+.score-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.team-red .score-value {
+  color: #ff6b6b;
+}
+
+.team-blue .score-value {
+  color: #6bb5ff;
+}
+
+.score-remaining {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.vs {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #555;
+}
