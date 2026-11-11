@@ -1,9 +1,9 @@
 # Render Blueprint — Codenames IT Edition
 # Dashboard: https://dashboard.render.com/ → New → Blueprint
-# Docs: https://render.com/docs/infrastructure-as-code
 #
-# Service public URLs may get a suffix (e.g. codenames-api-agv9). Use
-# fromService → RENDER_EXTERNAL_URL so CORS / VITE always match.
+# Actual public URLs (Render added suffixes):
+#   API:  https://codenames-api-agv9.onrender.com
+#   Web:  https://codenames-web-erca.onrender.com
 
 services:
   # ── Backend (Express + WebSocket) ──────────────────────────────
@@ -28,10 +28,7 @@ services:
       # In-memory rooms on Free (no persistent disk). For paid + disk, set
       # PERSISTENCE_DRIVER=file and PERSISTENCE_FILE=/data/rooms.json.
       - key: CORS_ORIGINS
-        fromService:
-          name: codenames-web
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://codenames-web-erca.onrender.com
 
   # ── Frontend (Vite static SPA) ─────────────────────────────────
   - type: web
@@ -39,7 +36,6 @@ services:
     runtime: static
     rootDir: frontend
     buildCommand: npm ci --include=dev && npm run build
-    # Relative to rootDir (see Render monorepo docs)
     staticPublishPath: dist
     routes:
       - type: rewrite
@@ -54,9 +50,6 @@ services:
         value: "22"
       - key: SKIP_INSTALL_DEPS
         value: "true"
-      # Baked into the SPA at build time (browser → public API URL)
+      # Baked into the SPA at build time — must match the live API URL
       - key: VITE_BACKEND_URL
-        fromService:
-          name: codenames-api
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://codenames-api-agv9.onrender.com

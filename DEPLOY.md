@@ -25,14 +25,19 @@ npm run build
 | `codenames-api` | Web Service (Node) | `https://codenames-api.onrender.com` |
 | `codenames-web` | Static Site | `https://codenames-web.onrender.com` |
 
-Blueprint связывает URL через `fromService` → `RENDER_EXTERNAL_URL`
-(имена могут получить суффикс, напр. `codenames-api-agv9.onrender.com`).
+Актуальные URL этого деплоя:
 
-- Фронт: `VITE_BACKEND_URL` = публичный URL API (WebSocket: `wss://…/ws`)
-- API: `CORS_ORIGINS` = публичный URL static site
+| Сервис | URL |
+|--------|-----|
+| Игра (открывать это) | https://codenames-web-erca.onrender.com |
+| API | https://codenames-api-agv9.onrender.com |
 
-После смены этих env у Static Site нужен **Manual Deploy**, чтобы Vite
-пересобрал бандл с новым `VITE_BACKEND_URL`.
+В Blueprint зашиты:
+- `VITE_BACKEND_URL=https://codenames-api-agv9.onrender.com`
+- `CORS_ORIGINS=https://codenames-web-erca.onrender.com`
+
+После смены env у Static Site нужен **Manual Deploy**, чтобы Vite
+пересобрал бандл.
 
 ### Шаги
 
