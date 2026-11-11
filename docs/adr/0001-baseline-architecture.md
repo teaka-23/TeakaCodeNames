@@ -26,22 +26,22 @@
 
 Клиент после входа в комнату держит WS с query `roomId`, `playerId`, `token`. Сервер — источник истины; после мутаций шлёт `game_update` (и узкие события вроде `guess_result`, `start_round`).
 
-### 3. Состояние комнат: in-memory, один инстанс
+### 3. Состояние комнат: in-memory + optional file, один инстанс
 
 - [`RoomManager`](../../backend/src/utils/roomManager.ts) хранит комнаты в памяти процесса.
 - Опциональная персистентность через [`PersistenceStore`](../../backend/src/utils/persistence.ts):
-  - по умолчанию / Render Free: **in-memory** (комнаты теряются при restart/sleep);
-  - Docker: `PERSISTENCE_DRIVER=file` → JSON-снимок (без WS-соединений).
+  - local / Docker: `PERSISTENCE_DRIVER=file` → JSON-снимок (без WS-соединений);
+  - Render Free blueprint: file → `/tmp/...` (soft crash recovery; sleep всё ещё стирает).
 - Горизонтальное масштабирование **не** поддерживается без общего store (Redis и т.п.) — это осознанный trade-off.
 
 ### 4. Правила партии на сервере
 
 - Колода 5×5: 8 red / 8 blue / 8 civilian / 1 assassin.
-- Роли: spymaster / guesser / spectator; команды red/blue.
-- Подсказка шпиона — **структурированная** (`word` + `count` 1..8) через WS `start_round`, не свободный текст.
-- История подсказок: `gameState.clueHistory` (команда, слово, число).
+- Роли: spymaster / guesser / spectator; команды red/blue; seats в waiting-lobby.
+- Подсказка шпиона — **ручная** структурированная (`word` + `count` 1..8) через WS `start_round` после mark targets; лимит угадываний `count + 1`.
+- Журнал: `eventLog` (+ legacy `clueHistory` для миграций). Чат комнаты — отдельный канал (ADR 0002).
 - Таймер хода на сервере; при истечении — `turn_expired` + смена хода.
-- Цвета карт видит spymaster (и debug/demo); guesser — только после reveal.
+- Цвета карт на проводе: см. ADR 0003 (`gameStateForViewer`).
 
 ### 5. Темы колоды на сервере
 
@@ -49,20 +49,18 @@
 
 ### 6. Безопасность (текущий уровень)
 
-- Helmet + rate limit на `/api`.
+- Helmet + rate limit на `/api`; soft rate limit на WS.
 - CORS allowlist (`CORS_ORIGINS`); на Render дополнительно допускаются origin `*.onrender.com`.
 - `crossOriginResourcePolicy: cross-origin` — чтобы static site мог читать API на другом хосте.
-- WS без cookie-сессий: доступ по room token в query string.
+- Auth: **per-player token** (ADR 0003), не shared room secret.
 
 ### 7. Чего baseline намеренно не содержит
 
-- Свободный текстовый чат комнаты или команды.
-- Отметки целевых карт шпионом под подсказку (mark targets).
-- Общий event log ходов (только `clueHistory`).
 - Redis / multi-instance sync.
 - Встроенный voice/video.
+- Classic 9/8 asymmetric deck / host-only start (продуктовые P3).
 
-Эти темы — отдельные ADR (следующий — коммуникация в партии: чат + лог + targets).
+Чат, event log и mark targets — **есть** (ADR 0002). Auth/visibility — ADR 0003.
 
 ## Consequences
 
@@ -70,18 +68,17 @@
 
 - Простая ментальная модель: один процесс API, один SPA.
 - Легко деплоить (Docker Compose или Render Free).
-- Игровые правила централизованы на сервере — сложнее читерить с клиента.
-- Подсказка отделена от «болтовни» — правила Codenames сохраняются.
+- Игровые правила и видимость расклада централизованы на сервере.
 
 ### Negative / risks
 
 - Split-host на Render требует синхронизации `VITE_BACKEND_URL` / CORS при смене hostname.
-- In-memory на Free: sleep/redeploy = потеря комнат.
+- Free sleep/redeploy всё ещё теряет комнаты (даже с `/tmp` snapshot).
 - Один инстанс ограничивает рост без смены persistence.
-- `clueHistory` недостаточен для полного разбора партии (нет guess/skip в логе).
 
 ## References
 
 - [`design.md`](../../design.md) — исходный дизайн
 - [`spec.md`](../../spec.md) — функциональные требования
 - [`DEPLOY.md`](../../DEPLOY.md) — Render / Docker / VPS
+- [ADR 0002](0002-room-chat-and-match-log.md), [ADR 0003](0003-auth-and-card-visibility.md)

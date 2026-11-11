@@ -1,16 +1,19 @@
 import { Card, GameState, Player, TeamColor, CardColor, ThemeId } from '../types';
-import { categoryOf, dealEntries } from '../themes';
+import { dealEntries } from '../themes';
 
 const GRID_SIZE = 5;
-const CARDS_PER_TEAM = 8;
-const CIVILIANS = 8;
-const ASSASSINS = 1;
+/** Classic Codenames: starting team has 9, other has 8, 7 civilians, 1 assassin. */
+export const STARTING_TEAM_CARDS = 9;
+export const SECOND_TEAM_CARDS = 8;
+export const CIVILIANS = 7;
+export const ASSASSINS = 1;
 const TOTAL_CARDS = GRID_SIZE * GRID_SIZE; // 25
 
 export function createGameState(
   roomId: string,
   players: Player[],
-  theme: ThemeId = 'it'
+  theme: ThemeId = 'it',
+  hostId = ''
 ): GameState {
   return {
     roomId,
@@ -21,36 +24,52 @@ export function createGameState(
     currentTurn: Math.random() < 0.5 ? 'red' : 'blue',
     clues: null,
     clueHistory: [],
+    eventLog: [],
+    clueTargets: [],
     scores: { red: 0, blue: 0 },
     remainingCards: {
-      red: CARDS_PER_TEAM,
-      blue: CARDS_PER_TEAM,
+      red: SECOND_TEAM_CARDS,
+      blue: SECOND_TEAM_CARDS,
       civilian: CIVILIANS,
       assassin: ASSASSINS,
     },
     turnDeadline: null,
+    guessesRemaining: null,
+    turnDurationMs: resolveDefaultTurnDurationMs(),
+    hostId,
     winner: null,
   };
 }
 
-export function generateCards(theme: ThemeId = 'it'): Card[] {
-  const words = dealEntries(theme, TOTAL_CARDS);
+/** Default turn clock from env; 0 disables the timer. */
+export function resolveDefaultTurnDurationMs(): number {
+  const raw = process.env.TURN_DURATION_MS;
+  if (raw === undefined || raw === '') return 60_000;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return 60_000;
+  return Math.round(n);
+}
 
-  // Create color distribution
+/**
+ * Deal a classic 9/8 board. `startingTeam` gets 9 agents; the other gets 8.
+ */
+export function generateCards(
+  theme: ThemeId = 'it',
+  startingTeam: TeamColor = Math.random() < 0.5 ? 'red' : 'blue'
+): Card[] {
+  const words = dealEntries(theme, TOTAL_CARDS);
+  const other: TeamColor = startingTeam === 'red' ? 'blue' : 'red';
+
   const colors: CardColor[] = [];
-  for (let i = 0; i < CARDS_PER_TEAM; i++) colors.push('red');
-  for (let i = 0; i < CARDS_PER_TEAM; i++) colors.push('blue');
+  for (let i = 0; i < STARTING_TEAM_CARDS; i++) colors.push(startingTeam);
+  for (let i = 0; i < SECOND_TEAM_CARDS; i++) colors.push(other);
   for (let i = 0; i < CIVILIANS; i++) colors.push('civilian');
   colors.push('assassin');
 
-  // Shuffle colors
   const shuffledColors = shuffleArray([...colors]);
-
-  // Shuffle words
   const shuffledWords = shuffleArray([...words]);
 
-  // Assign positions (row-major order in 5x5 grid)
-  const cards: Card[] = shuffledWords.map((entry, index) => ({
+  return shuffledWords.map((entry, index) => ({
     word: entry.word,
     picture: entry.picture,
     color: shuffledColors[index],
@@ -58,42 +77,14 @@ export function generateCards(theme: ThemeId = 'it'): Card[] {
     y: Math.floor(index / GRID_SIZE),
     revealed: false,
   }));
-
-  return cards;
 }
 
-export function generateClue(
-  cards: Card[],
-  team?: TeamColor,
-  theme: ThemeId = 'it'
-): { word: string; count: number } {
-  // Simple clue generation: find a word that relates to multiple cards of one team
-  // This is a basic AI - in production you'd use a Spymaster (human)
-  const teamCards = cards.filter(
-    c => !c.revealed && (team ? c.color === team : c.color === 'red' || c.color === 'blue')
-  );
-
-  // Count category frequencies
-  const categoryCounts = new Map<string, number>();
-
-  for (const card of teamCards) {
-    const category = categoryOf(theme, card.word);
-    categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
-  }
-
-  // Find the category with most unrevealed cards
-  let bestCategory = '';
-  let bestCount = 0;
-  for (const [cat, count] of categoryCounts) {
-    if (count > bestCount) {
-      bestCategory = cat;
-      bestCount = count;
-    }
-  }
-
+export function remainingForDeal(startingTeam: TeamColor): GameState['remainingCards'] {
   return {
-    word: bestCategory || 'tech',
-    count: bestCount || 1,
+    red: startingTeam === 'red' ? STARTING_TEAM_CARDS : SECOND_TEAM_CARDS,
+    blue: startingTeam === 'blue' ? STARTING_TEAM_CARDS : SECOND_TEAM_CARDS,
+    civilian: CIVILIANS,
+    assassin: ASSASSINS,
   };
 }
 
@@ -114,7 +105,7 @@ function finishGame(state: GameState, winner: TeamColor): void {
 /**
  * Apply one guess and return the next state.
  *
- * Own card: score +1, turn continues; the team wins when none of its 8 cards remain.
+ * Own card: score +1, turn continues; the team wins when none of its cards remain.
  * Opponent card: that team scores it, then the turn passes. If it was their last
  * card, they win immediately.
  * Civilian: turn passes. Assassin: the guessing team loses and the board flips.
@@ -155,7 +146,7 @@ export function handleGuess(
   } else if (card.color === 'civilian') {
     newState.remainingCards.civilian--;
     newState.currentTurn = oppositeTeam(currentTeam);
-  } else {
+  } else if (card.color === 'red' || card.color === 'blue') {
     const owner = card.color;
     newState.scores[owner]++;
     newState.remainingCards[owner]--;

@@ -50,7 +50,9 @@ npm run build
 ### Free plan: ограничения
 
 - После ~15 минут без трафика API засыпает (~1 мин на подъём).
-- Нет persistent disk → комнаты только в памяти, теряются при sleep/redeploy.
+- Blueprint пишет комнаты в `/tmp/codenames-rooms.json` — переживает soft-restart,
+  но **не** sleep/redeploy (нет durable disk).
+- Пустая комната живёт ~10 мин после последнего disconnect (`EMPTY_ROOM_GRACE_MS`).
 - Один инстанс — ок для текущего дизайна.
 
 ### Платный план + сохранение комнат

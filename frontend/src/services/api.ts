@@ -17,7 +17,8 @@ const API_BASE = resolveApiBase();
 
 const client = axios.create({
   baseURL: API_BASE,
-  timeout: 15000,
+  // Render free tier can take ~30–50s to wake; keep a single long attempt.
+  timeout: 45000,
 });
 
 client.interceptors.response.use(
@@ -27,6 +28,20 @@ client.interceptors.response.use(
     return Promise.reject(new Error(typeof message === 'string' ? message : 'Ошибка сети'));
   }
 );
+
+/** Fires onSlow if the request is still pending after delayMs (cold-start UX). */
+export async function withWarmupHint<T>(
+  work: () => Promise<T>,
+  onSlow?: () => void,
+  delayMs = 2500
+): Promise<T> {
+  const timer = window.setTimeout(() => onSlow?.(), delayMs);
+  try {
+    return await work();
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
 
 export interface CreateRoomResponse {
   roomId: string;
@@ -44,8 +59,16 @@ export interface JoinRoomResponse {
 }
 
 export const api = {
-  async createRoom(playerName: string, theme: ThemeId = 'it'): Promise<CreateRoomResponse> {
-    const response = await client.post('/rooms', { playerName, theme });
+  async createRoom(
+    playerName: string,
+    theme: ThemeId = 'it',
+    turnSeconds?: number
+  ): Promise<CreateRoomResponse> {
+    const response = await client.post('/rooms', {
+      playerName,
+      theme,
+      ...(turnSeconds === undefined ? {} : { turnSeconds }),
+    });
     return response.data;
   },
 
@@ -59,32 +82,44 @@ export const api = {
     return response.data;
   },
 
-  async getRoom(roomId: string): Promise<{ gameState: GameState }> {
-    const response = await client.get(`/rooms/${roomId}`);
+  async getRoom(
+    roomId: string,
+    auth?: { playerId: string; token: string }
+  ): Promise<{ gameState: GameState }> {
+    const response = await client.get(`/rooms/${roomId}`, {
+      params: auth ? { playerId: auth.playerId, token: auth.token } : undefined,
+      headers: auth ? { 'X-Room-Token': auth.token } : undefined,
+    });
     return response.data;
   },
 
   async claimSeat(
     roomId: string,
     playerId: string,
+    token: string,
     team: TeamColor,
     role: Exclude<PlayerRole, 'spectator'>
   ): Promise<{ gameState: GameState }> {
     const response = await client.post(`/rooms/${roomId}/claim-seat`, {
       playerId,
+      token,
       team,
       role,
     });
     return response.data;
   },
 
-  async startRoom(roomId: string): Promise<{ gameState: GameState }> {
-    const response = await client.post(`/rooms/${roomId}/start`);
+  async startRoom(
+    roomId: string,
+    playerId: string,
+    token: string
+  ): Promise<{ gameState: GameState }> {
+    const response = await client.post(`/rooms/${roomId}/start`, { playerId, token });
     return response.data;
   },
 
-  async deleteRoom(roomId: string): Promise<void> {
-    await client.delete(`/rooms/${roomId}`);
+  async deleteRoom(roomId: string, playerId: string, token: string): Promise<void> {
+    await client.delete(`/rooms/${roomId}`, { data: { playerId, token } });
   },
 
   async listRooms() {

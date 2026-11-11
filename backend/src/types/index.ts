@@ -15,7 +15,8 @@ export interface Card {
   word: string;
   /** Glyph that illustrates the word. It does not reveal the card color. */
   picture: string;
-  color: CardColor;
+  /** Null in player-facing views when the layout must stay hidden. */
+  color: CardColor | null;
   x: number;
   y: number;
   revealed: boolean;
@@ -25,6 +26,49 @@ export interface ClueEntry {
   word: string;
   count: number;
   team: TeamColor;
+}
+
+/** Structured match journal (separate from free-form room chat). */
+export type GameEvent =
+  | {
+      id: string;
+      at: number;
+      kind: 'clue';
+      team: TeamColor;
+      word: string;
+      count: number;
+      targetWords: string[];
+    }
+  | {
+      id: string;
+      at: number;
+      kind: 'guess';
+      team: TeamColor;
+      playerId: string;
+      playerName: string;
+      word: string;
+      color: CardColor;
+      correct: boolean;
+    }
+  | {
+      id: string;
+      at: number;
+      kind: 'skip' | 'turn_expired';
+      team: TeamColor;
+    }
+  | {
+      id: string;
+      at: number;
+      kind: 'game_over';
+      winner: TeamColor | null;
+    };
+
+export interface ChatMessage {
+  id: string;
+  at: number;
+  playerId: string;
+  playerName: string;
+  text: string;
 }
 
 export interface GameState {
@@ -40,6 +84,10 @@ export interface GameState {
   } | null;
   /** Every clue given this match, newest last. Survives turn changes. */
   clueHistory: ClueEntry[];
+  /** Full match journal including guesses and skips. */
+  eventLog: GameEvent[];
+  /** Words the current spymaster marked for the pending clue (cleared after start_round). */
+  clueTargets: string[];
   scores: {
     red: number;
     blue: number;
@@ -52,6 +100,15 @@ export interface GameState {
   };
   /** Epoch ms when the current turn expires; null while the round has not started. */
   turnDeadline: number | null;
+  /**
+   * Guesses left for the active clue (classic: count + 1).
+   * Null when no clue is in play.
+   */
+  guessesRemaining: number | null;
+  /** Turn clock length in ms; 0 disables the timer for this room. */
+  turnDurationMs: number;
+  /** Player id of the room creator — only they can start the match. */
+  hostId: string;
   /** Set when status becomes 'finished'; null/undefined while the game is running. */
   winner: TeamColor | null;
 }
@@ -119,6 +176,21 @@ export interface TurnExpiredMessage extends WsMessage {
   payload: { currentTurn: TeamColor };
 }
 
+export interface ChatMessagePayload extends WsMessage {
+  type: 'chat';
+  payload: ChatMessage;
+}
+
+export interface ChatHistoryMessage extends WsMessage {
+  type: 'chat_history';
+  payload: { messages: ChatMessage[] };
+}
+
+export interface ErrorMessage extends WsMessage {
+  type: 'error';
+  payload: { code: string; message: string };
+}
+
 export type ServerMessageType =
   | JoinRoomMessage
   | TeamAssignmentMessage
@@ -128,4 +200,7 @@ export type ServerMessageType =
   | StartRoundMessage
   | RevealClueMessage
   | PlayerListMessage
-  | TurnExpiredMessage;
+  | TurnExpiredMessage
+  | ChatMessagePayload
+  | ChatHistoryMessage
+  | ErrorMessage;

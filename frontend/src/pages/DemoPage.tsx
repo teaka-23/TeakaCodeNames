@@ -2,25 +2,27 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GameBoard from '../components/GameBoard';
 import Scoreboard from '../components/Scoreboard';
-import { api } from '../services/api';
+import { api, withWarmupHint } from '../services/api';
 import { THEMES, type ThemeId } from '../data/themes';
-import type { Card, CardColor, TeamColor } from '../types';
+import { shuffleDeal } from '../data/demoDecks';
+import type { Card, CardColor, GameState as SharedGameState, TeamColor } from '../types';
 import './DemoPage.css';
 
-interface GameState {
-  cards: Card[];
-  scores: { red: number; blue: number };
-  remainingCards: { red: number; blue: number; civilian: number; assassin: number };
-  currentTurn: TeamColor;
-  status: 'playing' | 'finished';
-  winner: TeamColor | null;
-}
+/** Local demo subset of the shared GameState (no room/WS fields). */
+type DemoGameState = Pick<
+  SharedGameState,
+  'cards' | 'scores' | 'remainingCards' | 'currentTurn' | 'status' | 'winner'
+> & { status: 'playing' | 'finished'; winner: TeamColor | null };
 
-function buildCards(entries: Array<{ word: string; picture: string }>): Card[] {
+function buildCards(
+  entries: Array<{ word: string; picture: string }>,
+  startingTeam: TeamColor
+): Card[] {
+  const other: TeamColor = startingTeam === 'red' ? 'blue' : 'red';
   const colors: CardColor[] = [];
-  for (let i = 0; i < 8; i++) colors.push('red');
-  for (let i = 0; i < 8; i++) colors.push('blue');
-  for (let i = 0; i < 8; i++) colors.push('civilian');
+  for (let i = 0; i < 9; i++) colors.push(startingTeam);
+  for (let i = 0; i < 8; i++) colors.push(other);
+  for (let i = 0; i < 7; i++) colors.push('civilian');
   colors.push('assassin');
 
   for (let i = colors.length - 1; i > 0; i--) {
@@ -38,13 +40,17 @@ function buildCards(entries: Array<{ word: string; picture: string }>): Card[] {
   }));
 }
 
-function createInitialGameState(cards: Card[]): GameState {
-  const turn: TeamColor = Math.random() < 0.5 ? 'red' : 'blue';
+function createInitialGameState(cards: Card[], startingTeam: TeamColor): DemoGameState {
   return {
     cards,
     scores: { red: 0, blue: 0 },
-    remainingCards: { red: 8, blue: 8, civilian: 8, assassin: 1 },
-    currentTurn: turn,
+    remainingCards: {
+      red: startingTeam === 'red' ? 9 : 8,
+      blue: startingTeam === 'blue' ? 9 : 8,
+      civilian: 7,
+      assassin: 1,
+    },
+    currentTurn: startingTeam,
     status: 'playing',
     winner: null,
   };
@@ -54,25 +60,39 @@ function DemoPage() {
   const navigate = useNavigate();
   const [theme, setTheme] = useState<ThemeId>('it');
   const [deckKey, setDeckKey] = useState(0);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [loadError, setLoadError] = useState('');
+  const [gameState, setGameState] = useState<DemoGameState | null>(null);
+  const [loadHint, setLoadHint] = useState('');
+  const [offline, setOffline] = useState(false);
   const [debugMode, setDebugMode] = useState(true);
   const [turnCount, setTurnCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setGameState(null);
-    setLoadError('');
+    setLoadHint('');
+    setOffline(false);
 
-    api.dealTheme(theme)
+    withWarmupHint(
+      () => api.dealTheme(theme),
+      () => {
+        if (!cancelled) setLoadHint('Сервер просыпается… обычно до минуты на бесплатном тарифе.');
+      }
+    )
       .then((cards) => {
         if (cancelled) return;
-        setGameState(createInitialGameState(buildCards(cards)));
+        const start: TeamColor = Math.random() < 0.5 ? 'red' : 'blue';
+        setGameState(createInitialGameState(buildCards(cards, start), start));
         setTurnCount(0);
+        setLoadHint('');
+        setOffline(false);
       })
-      .catch((err: unknown) => {
+      .catch(() => {
         if (cancelled) return;
-        setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить колоду');
+        const start: TeamColor = Math.random() < 0.5 ? 'red' : 'blue';
+        setGameState(createInitialGameState(buildCards(shuffleDeal(theme), start), start));
+        setTurnCount(0);
+        setOffline(true);
+        setLoadHint('API недоступен — играем с локальной колодой.');
       });
 
     return () => {
@@ -111,7 +131,7 @@ function DemoPage() {
       } else if (picked.color === 'civilian') {
         remaining.civilian--;
         currentTurn = currentTurn === 'red' ? 'blue' : 'red';
-      } else {
+      } else if (picked.color === 'red' || picked.color === 'blue') {
         const owner = picked.color;
         scores[owner]++;
         remaining[owner]--;
@@ -136,8 +156,12 @@ function DemoPage() {
           ← На главную
         </button>
 
-        <h1>🧪 Демо-режим</h1>
-        <p className="demo-subtitle">Колода приходит с сервера, ходы считаются в браузере</p>
+        <h1>Демо-режим</h1>
+        <p className="demo-subtitle">
+          {offline
+            ? 'Локальная колода — ходы в браузере, без комнаты и WebSocket.'
+            : 'Колода с сервера, ходы в браузере — без комнаты и WebSocket.'}
+        </p>
       </div>
 
       <div className="demo-themes" role="radiogroup" aria-label="Тема демо">
@@ -160,15 +184,16 @@ function DemoPage() {
           className={`btn-debug ${debugMode ? 'active' : ''}`}
           onClick={() => setDebugMode(!debugMode)}
         >
-          {debugMode ? '👁️ Скрыть цвета' : '👁️ Показать все карточки'}
+          {debugMode ? 'Скрыть цвета' : 'Показать расклад'}
         </button>
         <button className="btn-reset" onClick={handleReset}>
-          🔄 Новая игра
+          Новая раздача
         </button>
       </div>
 
-      {loadError && <p className="demo-error">{loadError}</p>}
-      {!gameState && !loadError && <p className="demo-subtitle">Загрузка колоды...</p>}
+      {loadHint && <p className={`demo-hint ${offline ? 'offline' : ''}`} role="status">{loadHint}</p>}
+      {!gameState && !loadHint && <p className="demo-subtitle">Загрузка колоды...</p>}
+      {!gameState && loadHint && !offline && <p className="demo-subtitle">Ждём ответ API…</p>}
 
       {gameState && (
         <>
@@ -180,7 +205,7 @@ function DemoPage() {
             <div className="stat-item">
               <span className="stat-label">Текущая команда:</span>
               <span className={`stat-value team-${gameState.currentTurn}`}>
-                {gameState.currentTurn === 'red' ? '🔴 Красные' : '🔵 Синие'}
+                {gameState.currentTurn === 'red' ? 'Красные' : 'Синие'}
               </span>
             </div>
           </div>
@@ -193,16 +218,16 @@ function DemoPage() {
 
           {gameState.status === 'finished' && (
             <div className="game-finished">
-              <h2>🏆 Игра окончена!</h2>
+              <h2>Игра окончена</h2>
               {gameState.winner === 'red' ? (
-                <p className="winner-red">🔴 Красные победили!</p>
+                <p className="winner-red">Красные победили</p>
               ) : gameState.winner === 'blue' ? (
-                <p className="winner-blue">🔵 Синие победили!</p>
+                <p className="winner-blue">Синие победили</p>
               ) : (
-                <p>Ничья!</p>
+                <p>Ничья</p>
               )}
               <button className="btn-play-again" onClick={handleReset}>
-                Начать новую игру
+                Новая раздача
               </button>
             </div>
           )}
@@ -217,13 +242,13 @@ function DemoPage() {
       )}
 
       <div className="demo-info">
-        <h3>📚 Как тестировать:</h3>
+        <h3>Как тестировать</h3>
         <ul>
-          <li>✅ <strong>Тема</strong> — переключите колоду сверху, раздача обновится</li>
-          <li>✅ <strong>Картинка</strong> — у каждого слова свой знак, цвет команды он не выдаёт</li>
-          <li>✅ <strong>Показать все карточки</strong> — цвета видны только в этом режиме</li>
-          <li>✅ <strong>Проверить победу</strong> — откройте все 8 карточек своей команды</li>
-          <li>✅ <strong>Проверить поражение</strong> — откройте 💀 Ассасина</li>
+          <li><strong>Тема</strong> — переключите колоду сверху, раздача обновится</li>
+          <li><strong>Картинка</strong> — знак при слове не выдаёт цвет команды</li>
+          <li><strong>Расклад</strong> — цвета видны только при «Показать расклад»</li>
+          <li><strong>Победа</strong> — откройте все карточки своей команды (9 у стартовой, 8 у второй)</li>
+          <li><strong>Поражение</strong> — откройте ассасина</li>
         </ul>
       </div>
     </div>

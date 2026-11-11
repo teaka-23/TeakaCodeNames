@@ -14,7 +14,8 @@ export interface Player {
 export interface Card {
   word: string;
   picture?: string;
-  color: CardColor;
+  /** Null when the server hides the layout from this viewer. */
+  color: CardColor | null;
   x: number;
   y: number;
   revealed: boolean;
@@ -24,6 +25,48 @@ export interface ClueEntry {
   word: string;
   count: number;
   team: TeamColor;
+}
+
+export type GameEvent =
+  | {
+      id: string;
+      at: number;
+      kind: 'clue';
+      team: TeamColor;
+      word: string;
+      count: number;
+      targetWords: string[];
+    }
+  | {
+      id: string;
+      at: number;
+      kind: 'guess';
+      team: TeamColor;
+      playerId: string;
+      playerName: string;
+      word: string;
+      color: CardColor;
+      correct: boolean;
+    }
+  | {
+      id: string;
+      at: number;
+      kind: 'skip' | 'turn_expired';
+      team: TeamColor;
+    }
+  | {
+      id: string;
+      at: number;
+      kind: 'game_over';
+      winner: TeamColor | null;
+    };
+
+export interface ChatMessage {
+  id: string;
+  at: number;
+  playerId: string;
+  playerName: string;
+  text: string;
 }
 
 export interface GameState {
@@ -38,6 +81,8 @@ export interface GameState {
     count: number;
   } | null;
   clueHistory?: ClueEntry[];
+  eventLog?: GameEvent[];
+  clueTargets?: string[];
   scores: {
     red: number;
     blue: number;
@@ -49,6 +94,12 @@ export interface GameState {
     assassin: number;
   };
   turnDeadline: number | null;
+  /** Guesses left for the active clue (count + 1). Null when no clue. */
+  guessesRemaining?: number | null;
+  /** 0 disables the turn timer. */
+  turnDurationMs?: number;
+  /** Room creator — only they can start. */
+  hostId?: string;
   winner?: TeamColor | null;
 }
 

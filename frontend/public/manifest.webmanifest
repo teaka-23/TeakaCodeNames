@@ -1,0 +1,18 @@
+{
+  "name": "Codenames",
+  "short_name": "Codenames",
+  "description": "Оперативный стол — онлайн Codenames",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#141210",
+  "theme_color": "#d4a35a",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

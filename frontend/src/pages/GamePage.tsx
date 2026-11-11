@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { wsClient } from '../services/webSocket';
-import type { Player, GameState, TeamColor, Card, WSMessage, PlayerRole } from '../types';
+import type { Player, GameState, TeamColor, Card, WSMessage, PlayerRole, ChatMessage, GameEvent } from '../types';
 import GameBoard from '../components/GameBoard';
 import Scoreboard from '../components/Scoreboard';
 import ClueDisplay from '../components/ClueDisplay';
@@ -81,11 +81,26 @@ function GamePage() {
   const [error, setError] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatDraft, setChatDraft] = useState('');
+  const [sideTab, setSideTab] = useState<'log' | 'chat'>('log');
+  const [sideSheetOpen, setSideSheetOpen] = useState(false);
+  const [connection, setConnection] = useState<'online' | 'reconnecting' | 'offline'>('online');
+  const [reconnectLabel, setReconnectLabel] = useState('');
 
-  const showNotification = (text: string) => {
+  const showNotification = useCallback((text: string, ms = 4000) => {
     setNotification(text);
-    setTimeout(() => setNotification(null), 4000);
-  };
+    window.setTimeout(() => setNotification(null), ms);
+  }, []);
+
+  const copyText = useCallback(async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showNotification(`${label} скопирован`, 1600);
+    } catch {
+      showNotification('Не удалось скопировать', 2000);
+    }
+  }, [showNotification]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -94,7 +109,7 @@ function GamePage() {
     const session = loadSession(upperRoomId);
     if (session) {
       wsClient.connect(upperRoomId, session.playerId, session.token);
-      api.getRoom(upperRoomId)
+      api.getRoom(upperRoomId, { playerId: session.playerId, token: session.token })
         .then(res => setGameData(prev => prev ? syncPlayer(prev, res.gameState) : null))
         .catch(() => {
           clearSession();
@@ -154,7 +169,7 @@ function GamePage() {
       if (message.type === 'turn_expired') {
         const payload = message.payload as { currentTurn: TeamColor };
         showNotification(
-          `⏱️ Время вышло! Ход переходит: ${payload.currentTurn === 'red' ? '🔴 Красные' : '🔵 Синие'}`
+          `Время вышло — ход: ${payload.currentTurn === 'red' ? 'красные' : 'синие'}`
         );
         return;
       }
@@ -167,24 +182,86 @@ function GamePage() {
           winner?: TeamColor;
         };
         if (payload.gameOver) {
-          const winnerText = payload.winner === 'red' ? '🔴 Красные' : '🔵 Синие';
-          showNotification(`🏆 ${winnerText} победили!`);
+          const winnerText = payload.winner === 'red' ? 'Красные' : 'Синие';
+          showNotification(`${winnerText} победили`);
         }
         return;
       }
 
+      if (message.type === 'chat_history') {
+        const payload = message.payload as { messages: ChatMessage[] };
+        setChatMessages(payload.messages ?? []);
+        return;
+      }
+
+      if (message.type === 'chat') {
+        const payload = message.payload as ChatMessage;
+        setChatMessages((prev) => [...prev, payload].slice(-100));
+        return;
+      }
+
+      if (message.type === 'ws_connected') {
+        setConnection('online');
+        setReconnectLabel('');
+        return;
+      }
+
+      if (message.type === 'ws_reconnecting') {
+        const payload = message.payload as { attempt?: number; max?: number };
+        setConnection('reconnecting');
+        setReconnectLabel(
+          `Переподключение ${payload.attempt ?? '?'}/${payload.max ?? '?'}…`
+        );
+        return;
+      }
+
+      if (message.type === 'ws_disconnected') {
+        const payload = message.payload as { code?: number };
+        if (typeof payload.code === 'number' && payload.code < 4000) {
+          setConnection('reconnecting');
+        }
+        return;
+      }
+
+      if (message.type === 'ws_send_failed') {
+        showNotification('Нет связи — ход не отправлен', 2500);
+        return;
+      }
+
+      if (message.type === 'error') {
+        const payload = message.payload as { message?: string };
+        showNotification(payload.message || 'Ошибка действия', 3000);
+        return;
+      }
+
       if (message.type === 'ws_reconnect_failed') {
-        showNotification('⚠️ Потеряно соединение с сервером');
+        setConnection('offline');
+        setReconnectLabel('Связь потеряна');
+        showNotification('Потеряно соединение с сервером');
       }
     };
 
-    const types = ['game_update', 'player_list', 'start_round', 'turn_expired', 'guess_result', 'ws_reconnect_failed'];
+    const types = [
+      'game_update',
+      'player_list',
+      'start_round',
+      'turn_expired',
+      'guess_result',
+      'chat',
+      'chat_history',
+      'error',
+      'ws_connected',
+      'ws_disconnected',
+      'ws_reconnecting',
+      'ws_send_failed',
+      'ws_reconnect_failed',
+    ];
     types.forEach(t => wsClient.on(t, handleMessage));
 
     return () => {
       types.forEach(t => wsClient.off(t, handleMessage));
     };
-  }, [gameData?.playerId]);
+  }, [gameData?.playerId, showNotification]);
 
   useEffect(() => {
     return () => wsClient.disconnect();
@@ -227,6 +304,27 @@ function GamePage() {
     wsClient.send({ type: 'guess', payload: { cardIndex } });
   }, []);
 
+  const handleMarkToggle = useCallback((cardIndex: number) => {
+    const cards = gameData?.gameState?.cards;
+    if (!cards?.[cardIndex] || cards[cardIndex].revealed) return;
+    const word = cards[cardIndex].word;
+    const current = gameData?.gameState?.clueTargets ?? [];
+    const next = current.includes(word)
+      ? current.filter((w) => w !== word)
+      : [...current, word].slice(0, 8);
+    wsClient.send({ type: 'mark_targets', payload: { words: next } });
+  }, [gameData?.gameState?.cards, gameData?.gameState?.clueTargets]);
+
+  const handleBoardClick = useCallback((cardIndex: number) => {
+    if (gameData?.gameState?.status === 'spymaster-ready'
+      && gameData.player?.role === 'spymaster'
+      && gameData.player.team === gameData.gameState.currentTurn) {
+      handleMarkToggle(cardIndex);
+      return;
+    }
+    handleGuess(cardIndex);
+  }, [gameData?.gameState?.status, gameData?.gameState?.currentTurn, gameData?.player, handleGuess, handleMarkToggle]);
+
   const handleSkipTurn = useCallback(() => {
     wsClient.send({ type: 'skip_turn', payload: {} });
   }, []);
@@ -236,31 +334,44 @@ function GamePage() {
     wsClient.send({ type: 'start_round', payload: { clue } });
   }, []);
 
+  const handleSendChat = useCallback(() => {
+    const text = chatDraft.trim();
+    if (!text) return;
+    wsClient.send({ type: 'chat', payload: { text } });
+    setChatDraft('');
+  }, [chatDraft]);
+
   const handleClaimSeat = useCallback(async (team: TeamColor, role: Exclude<PlayerRole, 'spectator'>) => {
     if (!gameData?.playerId || !gameData.roomId) return;
     setError('');
     try {
       wsClient.send({ type: 'claim_seat', payload: { team, role } });
-      const response = await api.claimSeat(gameData.roomId, gameData.playerId, team, role);
+      const response = await api.claimSeat(
+        gameData.roomId,
+        gameData.playerId,
+        gameData.token,
+        team,
+        role
+      );
       setGameData(prev => syncPlayer(prev, response.gameState));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Не удалось занять место');
     }
-  }, [gameData?.playerId, gameData?.roomId]);
+  }, [gameData?.playerId, gameData?.roomId, gameData?.token]);
 
   const handleStartGame = useCallback(async () => {
-    if (!gameData?.roomId) return;
+    if (!gameData?.roomId || !gameData.playerId || !gameData.token) return;
     setStarting(true);
     setError('');
     try {
-      const response = await api.startRoom(gameData.roomId);
+      const response = await api.startRoom(gameData.roomId, gameData.playerId, gameData.token);
       setGameData(prev => syncPlayer(prev, response.gameState));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Не удалось начать игру');
     } finally {
       setStarting(false);
     }
-  }, [gameData?.roomId]);
+  }, [gameData?.roomId, gameData?.playerId, gameData?.token]);
 
   const handleLeave = () => {
     wsClient.disconnect();
@@ -281,6 +392,9 @@ function GamePage() {
     return (
       <div className="game-join">
         <div className="join-card">
+          <button type="button" className="btn-back join-back" onClick={() => navigate('/')}>
+            ← На главную
+          </button>
           <h2>Комната: {roomId?.toUpperCase()}</h2>
           <p>Введите ваше имя, чтобы присоединиться</p>
 
@@ -291,15 +405,16 @@ function GamePage() {
               onChange={(e) => setPlayerName(e.target.value)}
               placeholder="Ваше имя..."
               maxLength={20}
+              autoComplete="nickname"
               onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
             />
           </div>
 
-          <button className="btn-join-game" onClick={handleJoin}>
+          <button className="btn-join-game" onClick={handleJoin} disabled={!playerName.trim()}>
             Присоединиться
           </button>
 
-          {error && <div className="error">{error}</div>}
+          {error && <div className="error" role="alert">{error}</div>}
           {!error && gameData?.gameState && (
             <p className="join-hint">
               В комнате: {gameData.gameState.players.length} игроков
@@ -311,7 +426,14 @@ function GamePage() {
   }
 
   const { player, gameState } = gameData;
-  if (!gameState) return null;
+  if (!gameState) {
+    return (
+      <div className="game-loading">
+        <div className="spinner"></div>
+        <p>Синхронизация комнаты...</p>
+      </div>
+    );
+  }
 
   const isSpectator = player.role === 'spectator';
   const isSpymaster = player.role === 'spymaster';
@@ -324,13 +446,17 @@ function GamePage() {
   const activePlayers = gameState.players.filter((p) => p.role !== 'spectator');
   const redPlayers = activePlayers.filter((p) => p.team === 'red');
   const bluePlayers = activePlayers.filter((p) => p.team === 'blue');
+  const isHost = Boolean(gameState.hostId) && player.id === gameState.hostId;
   const canStartGame =
     waiting
+    && isHost
     && activePlayers.length >= 3
     && redPlayers.length > 0
     && bluePlayers.length > 0;
   const roomLink = `${window.location.origin}/room/${gameData.roomId}`;
-  const clueHistory = gameState.clueHistory ?? [];
+  const eventLog = gameState.eventLog ?? [];
+  const clueTargets = gameState.clueTargets ?? [];
+  const markMode = canStartRound;
   const winner: TeamColor | null =
     gameState.winner ??
     (gameState.scores.red === gameState.scores.blue
@@ -339,10 +465,25 @@ function GamePage() {
         ? 'red'
         : 'blue');
 
+  const connectionBanner = connection !== 'online' ? (
+    <div
+      className={`connection-banner ${connection === 'offline' ? 'offline' : ''}`}
+      role="status"
+      aria-live="polite"
+    >
+      {reconnectLabel || (connection === 'offline' ? 'Нет связи' : 'Переподключение…')}
+    </div>
+  ) : null;
+
   if (waiting) {
     return (
       <div className="game-container">
-        {notification && <div className="toast-notification">{notification}</div>}
+        {notification && (
+          <div className="toast-notification" role="status" aria-live="polite">
+            {notification}
+          </div>
+        )}
+        {connectionBanner}
 
         <div className="game-header">
           <button className="btn-back" onClick={handleLeave}>
@@ -356,20 +497,23 @@ function GamePage() {
 
         <div className="lobby-wait">
           <h2>Комната {gameData.roomId}</h2>
-          <p>Выберите место. Нужны минимум 3 игрока и обе команды.</p>
+          <p>
+            Сядьте в команду полевым, затем один игрок может стать шпионом.
+            Нужны минимум 3 игрока и обе команды.
+          </p>
 
           <div className="invite-box">
             <div className="invite-row">
               <span className="invite-label">Код</span>
               <strong>{gameData.roomId}</strong>
-              <button type="button" className="copy-btn" onClick={() => navigator.clipboard.writeText(gameData.roomId)}>
+              <button type="button" className="copy-btn" onClick={() => copyText(gameData.roomId, 'Код')}>
                 Копировать
               </button>
             </div>
             <div className="invite-row">
               <span className="invite-label">Ссылка</span>
               <span className="invite-link">{roomLink}</span>
-              <button type="button" className="copy-btn" onClick={() => navigator.clipboard.writeText(roomLink)}>
+              <button type="button" className="copy-btn" onClick={() => copyText(roomLink, 'Ссылка')}>
                 Копировать
               </button>
             </div>
@@ -379,64 +523,50 @@ function GamePage() {
             {(['red', 'blue'] as TeamColor[]).map((team) => {
               const teamPlayers = team === 'red' ? redPlayers : bluePlayers;
               const spy = teamPlayers.find((p) => p.role === 'spymaster');
-              const guessers = teamPlayers.filter((p) => p.role === 'guesser');
+              const onThisTeam = player.team === team && player.role !== 'spectator';
+              const teamFull = teamPlayers.length >= 3;
+              const canJoinAsGuesser =
+                (!onThisTeam || player.role === 'spymaster' || isSpectator)
+                && (!teamFull || onThisTeam);
               return (
                 <div key={team} className={`seat-column team-${team}`}>
-                  <h3>{team === 'red' ? '🔴 Красные' : '🔵 Синие'}</h3>
+                  <h3>{team === 'red' ? 'Красные' : 'Синие'}</h3>
 
-                  <div className="seat-slot">
-                    <span className="seat-label">🕵️ Шпион</span>
-                    {spy ? (
-                      <div className={`seat-player ${spy.id === player.id ? 'me' : ''}`}>
-                        {spy.name}{spy.id === player.id ? ' (вы)' : ''}
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn-seat"
-                        onClick={() => handleClaimSeat(team, 'spymaster')}
-                        disabled={isSpectator && activePlayers.length >= 6}
-                      >
-                        Занять
-                      </button>
+                  <div className="seat-roster">
+                    {teamPlayers.length === 0 && (
+                      <p className="seat-empty">Пока пусто</p>
                     )}
-                    {spy && spy.id !== player.id && (
-                      <button
-                        type="button"
-                        className="btn-seat secondary"
-                        onClick={() => handleClaimSeat(team, 'spymaster')}
-                      >
-                        Стать шпионом
-                      </button>
-                    )}
-                    {spy?.id === player.id && (
-                      <button
-                        type="button"
-                        className="btn-seat secondary"
-                        onClick={() => handleClaimSeat(team, 'guesser')}
-                      >
-                        Стать угадывающим
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="seat-slot">
-                    <span className="seat-label">👆 Угадывающие</span>
-                    {guessers.map((p) => (
+                    {teamPlayers.map((p) => (
                       <div key={p.id} className={`seat-player ${p.id === player.id ? 'me' : ''}`}>
-                        {p.name}{p.id === player.id ? ' (вы)' : ''}
+                        <span>{p.name}{p.id === player.id ? ' (вы)' : ''}</span>
+                        <span className="seat-role">
+                          {p.role === 'spymaster' ? 'шпион' : 'полевой'}
+                        </span>
                       </div>
                     ))}
-                    {teamPlayers.length < 3 && (
-                      <button
-                        type="button"
-                        className="btn-seat"
-                        onClick={() => handleClaimSeat(team, 'guesser')}
-                        disabled={player.team === team && player.role === 'guesser'}
-                      >
-                        Сесть угадывающим
-                      </button>
-                    )}
+                  </div>
+
+                  <div className="seat-actions">
+                    <button
+                      type="button"
+                      className="btn-seat"
+                      onClick={() => handleClaimSeat(team, 'guesser')}
+                      disabled={
+                        (player.team === team && player.role === 'guesser')
+                        || (!onThisTeam && teamFull)
+                        || (isSpectator && activePlayers.length >= 6 && !canJoinAsGuesser)
+                      }
+                    >
+                      {onThisTeam && player.role === 'guesser' ? 'Вы здесь' : 'Сесть полевым'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-seat secondary"
+                      onClick={() => handleClaimSeat(team, 'spymaster')}
+                      disabled={spy?.id === player.id || (!onThisTeam && teamFull)}
+                    >
+                      {spy?.id === player.id ? 'Вы шпион' : spy ? 'Стать шпионом' : 'Сесть шпионом'}
+                    </button>
                   </div>
                 </div>
               );
@@ -444,16 +574,27 @@ function GamePage() {
           </div>
 
           {isSpectator && (
-            <p className="lobby-note">Вы наблюдатель. Займите место, чтобы играть.</p>
+            <p className="lobby-note">Вы наблюдатель. Сядьте в команду, чтобы играть.</p>
           )}
 
-          <button
-            className="btn-start-game"
-            onClick={handleStartGame}
-            disabled={!canStartGame || starting}
-          >
-            {starting ? 'Запускаю...' : canStartGame ? 'Начать игру' : `Ждём игроков (${activePlayers.length}/3+)`}
-          </button>
+          {isHost ? (
+            <button
+              className="btn-start-game"
+              onClick={handleStartGame}
+              disabled={!canStartGame || starting}
+            >
+              {starting
+                ? 'Запускаю...'
+                : canStartGame
+                  ? 'Начать игру'
+                  : `Ждём игроков (${activePlayers.length}/3+)`}
+            </button>
+          ) : (
+            <p className="lobby-note">
+              Начать может только создатель комнаты
+              {activePlayers.length < 3 ? ` · ждём игроков (${activePlayers.length}/3+)` : ''}.
+            </p>
+          )}
 
           {error && <div className="error">{error}</div>}
         </div>
@@ -463,7 +604,12 @@ function GamePage() {
 
   return (
     <div className="game-container">
-      {notification && <div className="toast-notification">{notification}</div>}
+      {notification && (
+        <div className="toast-notification" role="status" aria-live="polite">
+          {notification}
+        </div>
+      )}
+      {connectionBanner}
 
       <div className="game-header">
         <button className="btn-back" onClick={handleLeave}>
@@ -473,26 +619,34 @@ function GamePage() {
         <div className="player-info">
           <span className="theme-chip">{themeTitle(gameState.theme)}</span>
           {isSpectator ? (
-            <span className="spectator-badge">👀 Наблюдатель</span>
+            <span className="spectator-badge">Наблюдатель</span>
           ) : (
             <span className={`team-badge team-${player.team}`}>
-              {player.team === 'red' ? '🔴' : '🔵'} {player.team === 'red' ? 'КРАСНЫЕ' : 'СИНИЕ'}
+              {player.team === 'red' ? 'Красные' : 'Синие'}
             </span>
           )}
           <span className="player-name">{player.name}</span>
-          {isSpymaster && <span className="spymaster-badge">🕵️ Шпион</span>}
+          {isSpymaster && <span className="spymaster-badge">Шпион</span>}
         </div>
       </div>
 
-      {isSpymaster && !gameFinished && (
+      {markMode && (
+        <div className="mark-mode-banner" role="status" aria-live="polite">
+          <strong>Режим отметки целей</strong>
+          <span>Клик по карте на доске отмечает цель для подсказки.</span>
+          <span className="mark-count">Отмечено: {clueTargets.length}</span>
+        </div>
+      )}
+
+      {isSpymaster && !gameFinished && !markMode && (
         <div className="spymaster-panel">
-          <span>👁️ Вы видите все карты. Дайте подсказку своей команде.</span>
+          <span>Вы видите расклад. Когда ваш ход — отметьте цели на доске и дайте подсказку.</span>
         </div>
       )}
 
       {isSpectator && (
         <div className="spectator-panel">
-          <span>👀 Режим наблюдения: вы видите расклад, но не участвуете в игре.</span>
+          <span>Режим наблюдения: расклад виден, ходы недоступны.</span>
         </div>
       )}
 
@@ -502,13 +656,17 @@ function GamePage() {
         currentTurn={gameState.currentTurn}
       />
 
-      {!gameFinished && (
-        <TurnTimer deadline={gameState.turnDeadline} currentTurn={gameState.currentTurn} />
+      {!gameFinished && (gameState.turnDurationMs ?? 60_000) > 0 && (
+        <TurnTimer
+          deadline={gameState.turnDeadline}
+          currentTurn={gameState.currentTurn}
+          durationMs={gameState.turnDurationMs ?? 60_000}
+        />
       )}
 
       {gameFinished ? (
         <div className="game-over">
-          <h2>🏆 Игра окончена!</h2>
+          <h2>Игра окончена</h2>
           <p>
             {winner === null ? (
               'Ничья!'
@@ -533,6 +691,8 @@ function GamePage() {
             canStartRound={canStartRound}
             onStartRound={handleStartRound}
             isSpymaster={isSpymaster}
+            targetCount={clueTargets.length}
+            guessesRemaining={gameState.guessesRemaining ?? null}
           />
 
           {!isSpymaster && isCurrentTeam && gameState.status === 'playing' && (
@@ -543,27 +703,115 @@ function GamePage() {
         </>
       )}
 
-      {clueHistory.length > 0 && (
-        <div className="clue-history">
-          <h4>Журнал подсказок</h4>
-          <ol>
-            {clueHistory.map((entry, index) => (
-              <li key={`${entry.team}-${entry.word}-${index}`} className={`clue-history-item team-${entry.team}`}>
-                <span>{entry.team === 'red' ? '🔴' : '🔵'}</span>
-                <strong>{entry.word}</strong>
-                <span>×{entry.count}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
+      <div className="game-main-row">
+        <GameBoard
+          cards={gameState.cards}
+          onGuess={handleBoardClick}
+          disabled={!isCurrentTeam || isSpymaster || gameFinished || gameState.status !== 'playing'}
+          showAll={canSeeColors}
+          markMode={markMode}
+          markedWords={clueTargets}
+        />
 
-      <GameBoard
-        cards={gameState.cards}
-        onGuess={handleGuess}
-        disabled={!isCurrentTeam || isSpymaster || gameFinished || gameState.status !== 'playing'}
-        showAll={canSeeColors}
-      />
+        <button
+          type="button"
+          className="side-sheet-fab"
+          onClick={() => setSideSheetOpen(true)}
+        >
+          Журнал · Чат
+        </button>
+
+        {sideSheetOpen && (
+          <button
+            type="button"
+            className="side-sheet-backdrop"
+            aria-label="Закрыть панель"
+            onClick={() => setSideSheetOpen(false)}
+          />
+        )}
+
+        <aside className={`side-panel ${sideSheetOpen ? 'sheet-open' : ''}`}>
+          <div className="side-sheet-header">
+            <span>Журнал и чат</span>
+            <button type="button" className="side-sheet-close" onClick={() => setSideSheetOpen(false)}>
+              Закрыть
+            </button>
+          </div>
+
+          <div className="side-tabs" role="tablist" aria-label="Журнал и чат">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sideTab === 'log'}
+              className={sideTab === 'log' ? 'active' : ''}
+              onClick={() => setSideTab('log')}
+            >
+              Журнал
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sideTab === 'chat'}
+              className={sideTab === 'chat' ? 'active' : ''}
+              onClick={() => setSideTab('chat')}
+            >
+              Чат
+            </button>
+          </div>
+
+          <div
+            className={`match-log ${sideTab === 'log' ? 'tab-active' : 'tab-hidden'}`}
+            role="tabpanel"
+            aria-label="Журнал партии"
+          >
+            <div className="side-panel-label">Журнал</div>
+            {eventLog.length === 0 ? (
+              <p className="side-empty">Пока пусто — события партии появятся здесь.</p>
+            ) : (
+              <ul>
+                {eventLog.map((entry) => (
+                  <li key={entry.id} className={`log-item kind-${entry.kind}`}>
+                    {formatLogEntry(entry)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div
+            className={`room-chat ${sideTab === 'chat' ? 'tab-active' : 'tab-hidden'}`}
+            role="tabpanel"
+            aria-label="Чат комнаты"
+          >
+            <div className="side-panel-label">Чат</div>
+            <div className="chat-messages">
+              {chatMessages.length === 0 ? (
+                <p className="side-empty">Напишите что-нибудь комнате. Подсказки шпиона сюда не входят.</p>
+              ) : (
+                chatMessages.map((msg) => (
+                  <div key={msg.id} className="chat-line">
+                    <strong>{msg.playerName}</strong>
+                    <span>{msg.text}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="chat-compose">
+              <input
+                type="text"
+                value={chatDraft}
+                maxLength={200}
+                placeholder="Сообщение…"
+                onChange={(e) => setChatDraft(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+              />
+              <button type="button" onClick={handleSendChat} disabled={!chatDraft.trim()}>
+                →
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
 
       <div className="player-list">
         <h4>Игроки ({gameState.players.length})</h4>
@@ -572,7 +820,7 @@ function GamePage() {
             <div key={p.id} className={`player-item team-${p.team}`}>
               <span>{p.name}</span>
               <span className="player-role">
-                {p.role === 'spymaster' ? '🕵️' : p.role === 'spectator' ? '👀' : '👆'}
+                {p.role === 'spymaster' ? 'шпион' : p.role === 'spectator' ? 'наблюдатель' : 'полевой'}
               </span>
             </div>
           ))}
@@ -580,6 +828,28 @@ function GamePage() {
       </div>
     </div>
   );
+}
+
+function formatLogEntry(entry: GameEvent): string {
+  const team = 'team' in entry
+    ? (entry.team === 'red' ? 'Кр' : 'Си')
+    : '';
+  switch (entry.kind) {
+    case 'clue': {
+      const targets = entry.targetWords.length ? ` → ${entry.targetWords.join(', ')}` : '';
+      return `${team} · подсказка «${entry.word}» ×${entry.count}${targets}`;
+    }
+    case 'guess':
+      return `${team} · ${entry.playerName}: «${entry.word}» (${entry.correct ? 'своё' : entry.color})`;
+    case 'skip':
+      return `${team} · пропуск хода`;
+    case 'turn_expired':
+      return `${team} · время вышло`;
+    case 'game_over':
+      return entry.winner
+        ? `Победа: ${entry.winner === 'red' ? 'красные' : 'синие'}`
+        : 'Игра окончена';
+  }
 }
 
 export default GamePage;

@@ -1,27 +1,87 @@
 :root {
-  --team-red: #dc3545;
-  --team-blue: #0d6efd;
-  --card-revealed-red: #c82333;
-  --card-revealed-blue: #0b5ed5;
-  --card-civilian: #6c757d;
-  --card-assassin: #212529;
+  /* Ops-table palette — warm graphite + amber, muted team inks */
+  --bg: #161410;
+  --bg-elevated: #1e1a14;
+  --bg-panel: #241f18;
+  --bg-felt: #1a2318;
+  --ink: #ebe4d6;
+  --ink-muted: #a89f8e;
+  --ink-faint: #6e665a;
+  --line: rgba(235, 228, 214, 0.12);
+  --line-strong: rgba(235, 228, 214, 0.22);
+  --amber: #d4a35a;
+  --amber-soft: rgba(212, 163, 90, 0.18);
+  --team-red: #a84842;
+  --team-red-deep: #6e2a26;
+  --team-blue: #4a6d8c;
+  --team-blue-deep: #2c4560;
+  --card-civilian: #5a6358;
+  --card-assassin: #1a1612;
+  --card-face: #2a241c;
+  --card-face-edge: #3d3428;
+  --danger: #c45c4a;
+  --ok: #7a9a6a;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --radius: 6px;
+  --radius-lg: 12px;
+  --font-display: "Syne", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --card-revealed-red: var(--team-red-deep);
+  --card-revealed-blue: var(--team-blue-deep);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: #1a1a2e;
-  color: #e0e0e0;
+  margin: 0;
   min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(212, 163, 90, 0.08), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(74, 109, 140, 0.08), transparent 50%),
+    linear-gradient(180deg, #1a1610 0%, var(--bg) 40%, #12100c 100%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: var(--amber);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.team-red {
+  color: #e07a72;
+}
+
+.team-blue {
+  color: #7ea3c4;
 }
 
 .card {
   background: transparent;
   border: none;
-}
-
-.team-red {
-  color: var(--team-red);
-}
-
-.team-blue {
-  color: var(--team-blue);
 }

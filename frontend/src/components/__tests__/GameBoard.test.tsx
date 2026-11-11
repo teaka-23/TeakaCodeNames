@@ -35,7 +35,7 @@ describe('GameBoard', () => {
     const blue = screen.getByText('Django').closest('button');
     expect(red).toHaveAttribute('data-color', 'red');
     expect(blue).toHaveAttribute('data-color', 'blue');
-    expect(red?.style.background).toContain('rgb(220, 53, 69)');
+    expect(red?.style.background).toContain('rgb(184, 90, 82)');
   });
 
   it('paints face-down cards with a neutral back', () => {
@@ -43,7 +43,7 @@ describe('GameBoard', () => {
 
     const hidden = screen.getByText('React').closest('button');
     expect(hidden).not.toHaveAttribute('data-color');
-    expect(hidden).toHaveStyle({ background: '#2a2a4a', borderColor: '#444' });
+    expect(hidden?.style.background).toContain('rgb(47, 40, 31)');
   });
 
   it('shows plain words when showAll is off', () => {
@@ -76,10 +76,10 @@ describe('GameBoard', () => {
   });
 
   it('keeps the word on a revealed card and adds a color badge', () => {
-    render(<GameBoard cards={mixedCards} onGuess={vi.fn()} disabled={false} />);
+    const { container } = render(<GameBoard cards={mixedCards} onGuess={vi.fn()} disabled={false} />);
 
     expect(screen.getByText('Old')).toBeInTheDocument();
-    expect(screen.getAllByText('🔴')).toHaveLength(1);
+    expect(container.querySelector('.card-badge[data-tone="red"]')).toBeTruthy();
   });
 
   it('shows the picture glyph for a card', () => {
@@ -98,23 +98,23 @@ describe('GameBoard', () => {
     ];
     render(<GameBoard cards={cards} onGuess={vi.fn()} disabled={false} />);
 
-    expect(screen.getByText('🔴 Красные: 2')).toBeInTheDocument();
-    expect(screen.getByText('🔵 Синие: 1')).toBeInTheDocument();
-    expect(screen.getByText('⚪ Нейтральные: 0')).toBeInTheDocument();
+    expect(screen.getByText(/Красные\s+2/)).toBeInTheDocument();
+    expect(screen.getByText(/Синие\s+1/)).toBeInTheDocument();
+    expect(screen.getByText(/Нейтральные\s+0/)).toBeInTheDocument();
   });
 
   it('warns when the assassin has been revealed', () => {
     const cards: Card[] = [makeCard('Boom', 'assassin', 0, true)];
     render(<GameBoard cards={cards} onGuess={vi.fn()} disabled={false} />);
 
-    expect(screen.getByText('💀 Ассасин открыт!')).toBeInTheDocument();
+    expect(screen.getByText('Ассасин')).toBeInTheDocument();
   });
 
   it('does not show the assassin warning while it is hidden', () => {
     const cards: Card[] = [makeCard('Boom', 'assassin', 0, false)];
     render(<GameBoard cards={cards} onGuess={vi.fn()} disabled={false} />);
 
-    expect(screen.queryByText('💀 Ассасин открыт!')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ассасин')).not.toBeInTheDocument();
   });
 
   it('does not call onGuess when the board is disabled', async () => {

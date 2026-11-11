@@ -46,6 +46,7 @@ describe('FileStore', () => {
     const restored = reloaded.get(room.id);
     expect(restored).toBeDefined();
     expect(restored!.token).toBe(room.token);
+    expect(restored!.playerTokens.p1).toBe(room.playerTokens.p1);
     expect(restored!.gameState.players[0].name).toBe('Алиса');
     expect(restored!.gameState.turnDeadline).toBe(room.gameState.turnDeadline);
     // Connections are transient and must not be restored

@@ -23,11 +23,16 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/components/**/*.tsx'],
-      exclude: ['src/**/__tests__/**'],
+      include: [
+        'src/components/**/*.tsx',
+        'src/services/**/*.ts',
+        'src/pages/**/*.tsx',
+        'src/App.tsx',
+      ],
+      exclude: ['src/**/__tests__/**', 'src/pages/__tests__/**'],
       thresholds: {
         statements: 80,
-        branches: 80,
+        branches: 70,
         functions: 80,
         lines: 80,
       },

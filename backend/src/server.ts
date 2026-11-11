@@ -27,6 +27,7 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Слишком много запросов, попробуйте позже' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 app.use('/api', limiter);
 
@@ -64,7 +65,13 @@ app.use('/api', roomRoutes);
 
 // Health check
 app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    persistence: roomManager.persistenceLabel,
+    rooms: roomManager.listAll().length,
+    uptimeSec: Math.round(process.uptime()),
+  });
 });
 
 // 404 handler

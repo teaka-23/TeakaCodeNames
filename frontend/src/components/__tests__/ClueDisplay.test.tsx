@@ -31,8 +31,23 @@ describe('ClueDisplay', () => {
 
     expect(screen.getByText('база')).toBeInTheDocument();
     expect(screen.getByText('2 карточек')).toBeInTheDocument();
-    expect(screen.getByText('🔵 Синие — ход')).toBeInTheDocument();
+    expect(screen.getByText('Синие — ход')).toBeInTheDocument();
     expect(screen.getByText('Угадывайте карточки, подходящие к подсказке!')).toBeInTheDocument();
+  });
+
+  it('shows remaining guesses when provided', () => {
+    render(
+      <ClueDisplay
+        clue={{ word: 'код', count: 2 }}
+        currentTurn="red"
+        canStartRound={false}
+        onStartRound={vi.fn()}
+        isSpymaster={false}
+        guessesRemaining={3}
+      />
+    );
+
+    expect(screen.getByText('Осталось попыток: 3')).toBeInTheDocument();
   });
 
   it('shows a spymaster-specific instruction', () => {
@@ -49,7 +64,7 @@ describe('ClueDisplay', () => {
     expect(screen.getByText('Ваша команда угадывает. Следите за доской!')).toBeInTheDocument();
   });
 
-  it('submits the manually entered clue', async () => {
+  it('submits the manually entered clue when targets are marked', async () => {
     const onStartRound = vi.fn();
     render(
       <ClueDisplay
@@ -58,6 +73,7 @@ describe('ClueDisplay', () => {
         canStartRound
         onStartRound={onStartRound}
         isSpymaster
+        targetCount={2}
       />
     );
 
@@ -79,6 +95,7 @@ describe('ClueDisplay', () => {
         canStartRound
         onStartRound={onStartRound}
         isSpymaster
+        targetCount={1}
       />
     );
 
@@ -86,6 +103,24 @@ describe('ClueDisplay', () => {
     await userEvent.type(input, 'код{Enter}');
 
     expect(onStartRound).toHaveBeenCalledWith({ word: 'код', count: 1 });
+  });
+
+  it('keeps submit disabled until targets are marked', async () => {
+    const onStartRound = vi.fn();
+    render(
+      <ClueDisplay
+        clue={null}
+        currentTurn="red"
+        canStartRound
+        onStartRound={onStartRound}
+        isSpymaster
+        targetCount={0}
+      />
+    );
+
+    await userEvent.type(screen.getByPlaceholderText('Слово-подсказка'), 'тест');
+    expect(screen.getByRole('button', { name: 'Дать подсказку' })).toBeDisabled();
+    expect(onStartRound).not.toHaveBeenCalled();
   });
 
   it('rejects an empty clue', async () => {
@@ -97,6 +132,7 @@ describe('ClueDisplay', () => {
         canStartRound
         onStartRound={onStartRound}
         isSpymaster
+        targetCount={1}
       />
     );
 
@@ -115,6 +151,7 @@ describe('ClueDisplay', () => {
         canStartRound
         onStartRound={onStartRound}
         isSpymaster
+        targetCount={1}
       />
     );
 
@@ -132,6 +169,7 @@ describe('ClueDisplay', () => {
         canStartRound
         onStartRound={vi.fn()}
         isSpymaster
+        targetCount={1}
       />
     );
 

@@ -21,12 +21,16 @@ export class WebSocketClient {
   private ws: WebSocket | null = null;
   private handlers: Map<string, Set<MessageHandler>> = new Map();
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = 8;
   private reconnectTimeout: number | null = null;
   private roomId = '';
   private playerId = '';
   private token = '';
   private manualClose = false;
+
+  get connected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
 
   connect(roomId: string, playerId: string, token: string) {
     this.roomId = roomId;
@@ -34,12 +38,17 @@ export class WebSocketClient {
     this.token = token;
     this.manualClose = false;
 
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      this.ws.onclose = null;
+      this.ws.close();
+    }
+
     const url = `${getWsBase()}?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(playerId)}&token=${encodeURIComponent(token)}`;
     this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
-      console.log('WebSocket connected');
       this.reconnectAttempts = 0;
+      this.notifyHandlers({ type: 'ws_connected', payload: {} });
     };
 
     this.ws.onmessage = (event) => {
@@ -52,12 +61,13 @@ export class WebSocketClient {
     };
 
     this.ws.onclose = (event) => {
-      console.log('WebSocket disconnected:', event.code);
       this.notifyHandlers({ type: 'ws_disconnected', payload: { code: event.code } });
       // 4xxx codes are deliberate rejections (bad params, room gone, bad token) —
       // reconnecting cannot succeed, so don't even try.
       if (!this.manualClose && event.code < 4000) {
         this.attemptReconnect();
+      } else if (!this.manualClose && event.code >= 4000) {
+        this.notifyHandlers({ type: 'ws_reconnect_failed', payload: { code: event.code } });
       }
     };
 
@@ -81,9 +91,9 @@ export class WebSocketClient {
   send(message: WSMessage) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
-    } else {
-      console.warn('WebSocket is not connected');
+      return;
     }
+    this.notifyHandlers({ type: 'ws_send_failed', payload: {} });
   }
 
   on(messageType: string, handler: MessageHandler) {
@@ -104,14 +114,20 @@ export class WebSocketClient {
 
   private attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
       this.notifyHandlers({ type: 'ws_reconnect_failed', payload: {} });
       return;
     }
 
     this.reconnectAttempts++;
-    const timeout = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
-    console.log(`Reconnecting in ${timeout}ms (attempt ${this.reconnectAttempts})`);
+    const timeout = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 12000);
+    this.notifyHandlers({
+      type: 'ws_reconnecting',
+      payload: {
+        attempt: this.reconnectAttempts,
+        max: this.maxReconnectAttempts,
+        inMs: timeout,
+      },
+    });
 
     this.reconnectTimeout = window.setTimeout(() => {
       if (this.roomId && this.playerId && this.token) {

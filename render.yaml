@@ -25,8 +25,16 @@ services:
         value: production
       - key: SKIP_INSTALL_DEPS
         value: "true"
-      # In-memory rooms on Free (no persistent disk). For paid + disk, set
-      # PERSISTENCE_DRIVER=file and PERSISTENCE_FILE=/data/rooms.json.
+      # Soft persistence for crash recovery while the instance is awake.
+      # Free tier has no durable disk — /tmp is wiped on sleep/redeploy.
+      # For paid + disk: PERSISTENCE_FILE=/data/rooms.json
+      - key: PERSISTENCE_DRIVER
+        value: file
+      - key: PERSISTENCE_FILE
+        value: /tmp/codenames-rooms.json
+      # Keep empty rooms ~10 min so brief disconnects don't wipe the match.
+      - key: EMPTY_ROOM_GRACE_MS
+        value: "600000"
       - key: CORS_ORIGINS
         value: https://codenames-web-erca.onrender.com
 

@@ -1,6 +1,12 @@
 import { randomUUID } from 'crypto';
-import type { GameState, Player, ThemeId } from '../types';
-import { createGameState, generateCards, handleGuess } from './gameLogic';
+import type { ChatMessage, GameEvent, GameState, Player, ThemeId } from '../types';
+import {
+  createGameState,
+  generateCards,
+  handleGuess,
+  remainingForDeal,
+  resolveDefaultTurnDurationMs,
+} from './gameLogic';
 import type { WebSocket } from 'ws';
 import {
   createPersistenceStore,
@@ -11,15 +17,23 @@ import {
 
 export type RoomStatus = 'waiting' | 'spymaster-ready' | 'playing' | 'finished';
 
-export const TURN_DURATION_MS = 60_000;
+/** Default / fallback; rooms store their own `turnDurationMs` (0 = off). */
+export const TURN_DURATION_MS = resolveDefaultTurnDurationMs();
+export const EVENT_LOG_MAX = 200;
+export const CHAT_HISTORY_MAX = 100;
+export const CHAT_TEXT_MAX = 200;
 
 export interface GameRoom {
   id: string;
+  /** Legacy field kept for persistence compat; equals the creator's player token. */
   token: string;
+  /** Auth secret per playerId — required for WS and privileged REST. */
+  playerTokens: Record<string, string>;
   gameState: GameState;
   maxPlayers: number;
   createdAt: number;
   playerConnections: Map<string, WebSocket>;
+  chatMessages: ChatMessage[];
 }
 
 export class RoomManager {
@@ -42,10 +56,32 @@ export class RoomManager {
     for (const snapshot of persisted) {
       const theme = snapshot.gameState.theme ?? 'it';
       const clueHistory = snapshot.gameState.clueHistory ?? [];
+      const eventLog = snapshot.gameState.eventLog ?? migrateClueHistory(clueHistory);
+      const clueTargets = snapshot.gameState.clueTargets ?? [];
+      const guessesRemaining = snapshot.gameState.guessesRemaining ?? null;
+      const turnDurationMs = snapshot.gameState.turnDurationMs ?? resolveDefaultTurnDurationMs();
+      const hostId = snapshot.gameState.hostId
+        ?? snapshot.gameState.players[0]?.id
+        ?? '';
+      const playerTokens = snapshot.playerTokens
+        ?? Object.fromEntries(
+          snapshot.gameState.players.map((p) => [p.id, snapshot.token])
+        );
       this.rooms.set(snapshot.id, {
         ...snapshot,
-        gameState: { ...snapshot.gameState, theme, clueHistory },
+        playerTokens,
+        gameState: {
+          ...snapshot.gameState,
+          theme,
+          clueHistory,
+          eventLog,
+          clueTargets,
+          guessesRemaining,
+          turnDurationMs,
+          hostId,
+        },
         playerConnections: new Map(),
+        chatMessages: snapshot.chatMessages ?? [],
       });
     }
     return persisted.length;
@@ -70,19 +106,80 @@ export class RoomManager {
     const snapshots: PersistedRoom[] = Array.from(this.rooms.values()).map((room) => ({
       id: room.id,
       token: room.token,
+      playerTokens: room.playerTokens,
       gameState: room.gameState,
       maxPlayers: room.maxPlayers,
       createdAt: room.createdAt,
+      chatMessages: room.chatMessages,
     }));
 
     await this.store.save(snapshots);
+  }
+
+  appendEvent(
+    roomId: string,
+    event:
+      | Omit<Extract<GameEvent, { kind: 'clue' }>, 'id' | 'at'>
+      | Omit<Extract<GameEvent, { kind: 'guess' }>, 'id' | 'at'>
+      | Omit<Extract<GameEvent, { kind: 'skip' | 'turn_expired' }>, 'id' | 'at'>
+      | Omit<Extract<GameEvent, { kind: 'game_over' }>, 'id' | 'at'>
+  ): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    if (!room.gameState.eventLog) room.gameState.eventLog = [];
+    const full = {
+      ...event,
+      id: randomUUID().slice(0, 8),
+      at: Date.now(),
+    } as GameEvent;
+    room.gameState.eventLog.push(full);
+    if (room.gameState.eventLog.length > EVENT_LOG_MAX) {
+      room.gameState.eventLog = room.gameState.eventLog.slice(-EVENT_LOG_MAX);
+    }
+    this.schedulePersist();
+  }
+
+  setClueTargets(roomId: string, words: string[]): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    room.gameState.clueTargets = words;
+    this.schedulePersist();
+  }
+
+  appendChat(roomId: string, playerId: string, text: string): ChatMessage | null {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+    const player = room.gameState.players.find((p) => p.id === playerId);
+    if (!player) return null;
+
+    const cleaned = text.replace(/\s+/g, ' ').trim().slice(0, CHAT_TEXT_MAX);
+    if (!cleaned) return null;
+
+    const message: ChatMessage = {
+      id: randomUUID().slice(0, 8),
+      at: Date.now(),
+      playerId: player.id,
+      playerName: player.name,
+      text: cleaned,
+    };
+    room.chatMessages.push(message);
+    if (room.chatMessages.length > CHAT_HISTORY_MAX) {
+      room.chatMessages = room.chatMessages.slice(-CHAT_HISTORY_MAX);
+    }
+    this.schedulePersist();
+    return message;
   }
 
   get persistenceLabel(): string {
     return this.store.label;
   }
 
-  create(playerName: string, playerId: string, theme: ThemeId = 'it'): GameRoom {
+  create(
+    playerName: string,
+    playerId: string,
+    theme: ThemeId = 'it',
+    turnDurationMs: number = resolveDefaultTurnDurationMs()
+  ): GameRoom {
     let roomId = generateRoomId();
     // Ensure uniqueness
     while (this.rooms.has(roomId)) {
@@ -97,20 +194,36 @@ export class RoomManager {
       role: 'guesser',
     };
 
-    const gameState = createGameState(roomId, [player], theme);
+    const gameState = createGameState(roomId, [player], theme, playerId);
+    gameState.turnDurationMs = Math.max(0, Math.round(turnDurationMs));
 
     const room: GameRoom = {
       id: roomId,
       token,
+      playerTokens: { [playerId]: token },
       gameState,
       maxPlayers: 6,
       createdAt: Date.now(),
       playerConnections: new Map(),
+      chatMessages: [],
     };
 
     this.rooms.set(roomId, room);
     this.schedulePersist();
     return room;
+  }
+
+  /** Issue or look up the auth token for a player in the room. */
+  tokenFor(roomId: string, playerId: string): string | undefined {
+    return this.rooms.get(roomId)?.playerTokens[playerId];
+  }
+
+  /** True when playerId is a member and token matches that player. */
+  authenticate(roomId: string, playerId: string, token: string | null | undefined): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room || !token || !playerId) return false;
+    if (!room.gameState.players.some((p) => p.id === playerId)) return false;
+    return room.playerTokens[playerId] === token;
   }
 
   get(roomId: string): GameRoom | undefined {
@@ -160,6 +273,7 @@ export class RoomManager {
     }
 
     room.gameState.players.push(player);
+    room.playerTokens[playerId] = generateToken();
     this.schedulePersist();
     return room;
   }
@@ -223,7 +337,7 @@ export class RoomManager {
     return room;
   }
 
-  start(roomId: string): GameRoom {
+  start(roomId: string, byPlayerId?: string): GameRoom {
     const room = this.rooms.get(roomId);
     if (!room) {
       throw new Error('Room not found');
@@ -231,6 +345,10 @@ export class RoomManager {
 
     if (room.gameState.status !== 'waiting') {
       throw new Error('Game already started');
+    }
+
+    if (byPlayerId && room.gameState.hostId && byPlayerId !== room.gameState.hostId) {
+      throw new Error('Only host can start');
     }
 
     if (this.activePlayerCount(room) < 3) {
@@ -256,11 +374,16 @@ export class RoomManager {
       bluePlayers[0].role = 'spymaster';
     }
 
-    room.gameState.cards = generateCards(room.gameState.theme ?? 'it');
+    const startingTeam = Math.random() < 0.5 ? 'red' : 'blue';
+    room.gameState.cards = generateCards(room.gameState.theme ?? 'it', startingTeam);
+    room.gameState.remainingCards = remainingForDeal(startingTeam);
     room.gameState.status = 'spymaster-ready';
-    room.gameState.currentTurn = Math.random() < 0.5 ? 'red' : 'blue';
+    room.gameState.currentTurn = startingTeam;
     room.gameState.clues = null;
     room.gameState.clueHistory = [];
+    room.gameState.eventLog = [];
+    room.gameState.clueTargets = [];
+    room.gameState.guessesRemaining = null;
     room.gameState.turnDeadline = null;
     room.gameState.winner = null;
     this.clearTurnTimer(roomId);
@@ -269,12 +392,19 @@ export class RoomManager {
     return room;
   }
 
-  /** Arm the 60s turn clock. Called when a round actually starts (a clue is given). */
+  /** Arm the turn clock when a clue is given. No-op when turnDurationMs is 0. */
   startTurnClock(roomId: string): void {
     const room = this.rooms.get(roomId);
     if (!room) return;
-    room.gameState.turnDeadline = Date.now() + TURN_DURATION_MS;
-    this.armTurnTimer(roomId);
+    const duration = room.gameState.turnDurationMs ?? TURN_DURATION_MS;
+    if (!duration || duration <= 0) {
+      room.gameState.turnDeadline = null;
+      this.clearTurnTimer(roomId);
+      this.schedulePersist();
+      return;
+    }
+    room.gameState.turnDeadline = Date.now() + duration;
+    this.armTurnTimer(roomId, duration);
     this.schedulePersist();
   }
 
@@ -287,8 +417,9 @@ export class RoomManager {
     this.schedulePersist();
   }
 
-  private armTurnTimer(roomId: string): void {
+  private armTurnTimer(roomId: string, durationMs: number = TURN_DURATION_MS): void {
     this.clearTurnTimer(roomId);
+    if (!durationMs || durationMs <= 0) return;
     const timer = setTimeout(() => {
       this.turnTimers.delete(roomId);
       const room = this.rooms.get(roomId);
@@ -296,7 +427,7 @@ export class RoomManager {
       if (room.gameState.status !== 'playing') return;
       this.passTurn(roomId);
       this.onTurnExpired?.(roomId);
-    }, TURN_DURATION_MS);
+    }, durationMs);
     timer.unref?.();
     this.turnTimers.set(roomId, timer);
   }
@@ -329,6 +460,8 @@ export class RoomManager {
 
     room.gameState.currentTurn = room.gameState.currentTurn === 'red' ? 'blue' : 'red';
     room.gameState.clues = null;
+    room.gameState.clueTargets = [];
+    room.gameState.guessesRemaining = null;
     room.gameState.turnDeadline = null;
     room.gameState.status = 'spymaster-ready';
     this.clearTurnTimer(roomId);
@@ -359,6 +492,10 @@ export class RoomManager {
       throw new Error('Round has not started');
     }
 
+    if (room.gameState.guessesRemaining !== null && room.gameState.guessesRemaining <= 0) {
+      throw new Error('No guesses remaining');
+    }
+
     const result = handleGuess(room.gameState, cardIndex);
     room.gameState = result.newState;
 
@@ -366,12 +503,29 @@ export class RoomManager {
     // must not keep running the previous team's clock.
     if (result.gameOver) {
       room.gameState.turnDeadline = null;
+      room.gameState.clueTargets = [];
+      room.gameState.guessesRemaining = null;
       this.clearTurnTimer(roomId);
     } else if (room.gameState.currentTurn !== result.previousTurn) {
       room.gameState.turnDeadline = null;
       room.gameState.clues = null;
+      room.gameState.clueTargets = [];
+      room.gameState.guessesRemaining = null;
       room.gameState.status = 'spymaster-ready';
       this.clearTurnTimer(roomId);
+    } else {
+      // Correct guess — classic limit is clue.count + 1
+      const left = Math.max(0, (room.gameState.guessesRemaining ?? 1) - 1);
+      room.gameState.guessesRemaining = left;
+      if (left <= 0) {
+        room.gameState.currentTurn = room.gameState.currentTurn === 'red' ? 'blue' : 'red';
+        room.gameState.clues = null;
+        room.gameState.clueTargets = [];
+        room.gameState.guessesRemaining = null;
+        room.gameState.turnDeadline = null;
+        room.gameState.status = 'spymaster-ready';
+        this.clearTurnTimer(roomId);
+      }
     }
 
     this.schedulePersist();
@@ -409,6 +563,18 @@ export class RoomManager {
     }
     this.schedulePersist();
   }
+}
+
+function migrateClueHistory(clueHistory: GameState['clueHistory']): GameEvent[] {
+  return clueHistory.map((entry, index) => ({
+    id: `legacy-${index}`,
+    at: 0,
+    kind: 'clue' as const,
+    team: entry.team,
+    word: entry.word,
+    count: entry.count,
+    targetWords: [],
+  }));
 }
 
 function generateRoomId(): string {

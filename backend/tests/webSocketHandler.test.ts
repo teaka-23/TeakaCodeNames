@@ -142,12 +142,33 @@ function buildStartedRoom() {
   return r;
 }
 
-/** Open a socket and consume the initial player_list + game_update burst. */
+function playerToken(playerId: string): string {
+  return roomManager.tokenFor(room.id, playerId)!;
+}
+
+/** Open a socket and consume the initial player_list + game_update + chat_history burst. */
 async function openSynced(roomId: string, playerId: string, token: string): Promise<Socket> {
   const socket = await Socket.open(roomId, playerId, token);
   await socket.next('player_list');
   await socket.next('game_update');
+  await socket.next('chat_history');
   return socket;
+}
+
+/** Spymaster must mark ≥1 target before start_round is accepted. */
+async function markAndClue(
+  socket: Socket,
+  roomRef: typeof room,
+  clue: { word: string; count: number },
+  targetCount = 1
+) {
+  const words = roomRef.gameState.cards
+    .filter((c) => !c.revealed)
+    .slice(0, targetCount)
+    .map((c) => c.word);
+  socket.send('mark_targets', { words });
+  await socket.next('game_update');
+  socket.send('start_round', { clue });
 }
 
 beforeAll((done) => {
@@ -204,9 +225,23 @@ describe('WebSocket authentication', () => {
     expect(code).toBe(4003);
   });
 
+  it('closes with 4002 when the player is not in the room', async () => {
+    room = buildStartedRoom();
+    const { code } = await openRaw(`roomId=${room.id}&playerId=stranger&token=whatever`);
+    expect(code).toBe(4002);
+  });
+
+  it('rejects another player token for this playerId', async () => {
+    room = buildStartedRoom();
+    const { code } = await openRaw(
+      `roomId=${room.id}&playerId=p1&token=${encodeURIComponent(playerToken('p2'))}`
+    );
+    expect(code).toBe(4003);
+  });
+
   it('accepts a valid token', async () => {
     room = buildStartedRoom();
-    const socket = await Socket.open(room.id, 'p1', room.token);
+    const socket = await Socket.open(room.id, 'p1', playerToken('p1'));
     expect(socket.ws.readyState).toBe(WebSocket.OPEN);
   });
 });
@@ -214,7 +249,7 @@ describe('WebSocket authentication', () => {
 describe('WebSocket initial state', () => {
   it('sends player_list and game_update on connect', async () => {
     room = buildStartedRoom();
-    const socket = await Socket.open(room.id, 'p1', room.token);
+    const socket = await Socket.open(room.id, 'p1', playerToken('p1'));
 
     const playerList = await socket.next('player_list');
     expect((playerList.payload as Player[]).length).toBe(3);
@@ -226,7 +261,7 @@ describe('WebSocket initial state', () => {
 
   it('registers the connection in the room', async () => {
     room = buildStartedRoom();
-    await openSynced(room.id, 'p1', room.token);
+    await openSynced(room.id, 'p1', playerToken('p1'));
     expect(room.playerConnections.has('p1')).toBe(true);
   });
 });
@@ -238,30 +273,46 @@ describe('WebSocket start_round', () => {
       (p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn
     )!;
 
-    const socket = await openSynced(room.id, spymaster.id, room.token);
-    socket.send('start_round', { clue: { word: 'база', count: 2 } });
+    const socket = await openSynced(room.id, spymaster.id, playerToken(spymaster.id));
+    await markAndClue(socket, room, { word: 'база', count: 2 });
 
     const state = (await socket.next('game_update')).payload as GameState;
     expect(state.clues).toEqual({ word: 'база', count: 2 });
+    expect(state.guessesRemaining).toBe(3);
     expect(state.status).toBe('playing');
+    expect(state.eventLog.some((e) => e.kind === 'clue' && e.word === 'база')).toBe(true);
   });
 
   it('clamps the clue count into 1..8', async () => {
     room = buildStartedRoom();
     const spymaster = room.gameState.players.find((p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn)!;
-    const socket = await openSynced(room.id, spymaster.id, room.token);
+    const socket = await openSynced(room.id, spymaster.id, playerToken(spymaster.id));
 
-    socket.send('start_round', { clue: { word: 'сеть', count: 99 } });
+    await markAndClue(socket, room, { word: 'сеть', count: 99 });
 
     expect(((await socket.next('game_update')).payload as GameState).clues)
       .toEqual({ word: 'сеть', count: 8 });
   });
 
+  it('ignores start_round without marked targets', async () => {
+    room = buildStartedRoom();
+    const spymaster = room.gameState.players.find((p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn)!;
+    const socket = await openSynced(room.id, spymaster.id, playerToken(spymaster.id));
+
+    socket.send('start_round', { clue: { word: 'база', count: 1 } });
+    const messages = await socket.drain();
+
+    expect(messages.some(m => m.type === 'start_round')).toBe(false);
+    expect(room.gameState.clues).toBeNull();
+  });
+
   it('ignores start_round without a clue word', async () => {
     room = buildStartedRoom();
     const spymaster = room.gameState.players.find((p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn)!;
-    const socket = await openSynced(room.id, spymaster.id, room.token);
+    const socket = await openSynced(room.id, spymaster.id, playerToken(spymaster.id));
 
+    socket.send('mark_targets', { words: [room.gameState.cards[0].word] });
+    await socket.next('game_update');
     socket.send('start_round', {});
     const messages = await socket.drain();
 
@@ -273,10 +324,10 @@ describe('WebSocket start_round', () => {
   it('rejects a clue that matches a board word', async () => {
     room = buildStartedRoom();
     const spymaster = room.gameState.players.find((p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn)!;
-    const socket = await openSynced(room.id, spymaster.id, room.token);
+    const socket = await openSynced(room.id, spymaster.id, playerToken(spymaster.id));
     const boardWord = room.gameState.cards[0].word;
 
-    socket.send('start_round', { clue: { word: boardWord, count: 1 } });
+    await markAndClue(socket, room, { word: boardWord, count: 1 });
     const messages = await socket.drain();
 
     expect(messages.some(m => m.type === 'start_round')).toBe(false);
@@ -286,9 +337,9 @@ describe('WebSocket start_round', () => {
   it('keeps clue history after the turn passes', async () => {
     room = buildStartedRoom();
     const spymaster = room.gameState.players.find((p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn)!;
-    const socket = await openSynced(room.id, spymaster.id, room.token);
+    const socket = await openSynced(room.id, spymaster.id, playerToken(spymaster.id));
 
-    socket.send('start_round', { clue: { word: 'архив', count: 2 } });
+    await markAndClue(socket, room, { word: 'архив', count: 2 });
     await socket.next('game_update');
     roomManager.passTurn(room.id);
 
@@ -301,13 +352,33 @@ describe('WebSocket start_round', () => {
   it('ignores start_round from a non-spymaster', async () => {
     room = buildStartedRoom();
     const guesser = room.gameState.players.find((p: Player) => p.role === 'guesser')!;
-    const socket = await openSynced(room.id, guesser.id, room.token);
+    const socket = await openSynced(room.id, guesser.id, playerToken(guesser.id));
 
+    socket.send('mark_targets', { words: [room.gameState.cards[0].word] });
+    await socket.drain();
     socket.send('start_round', { clue: { word: 'хак', count: 1 } });
     const messages = await socket.drain();
 
     expect(messages.some(m => m.type === 'start_round')).toBe(false);
     expect(room.gameState.clues).toBeNull();
+  });
+});
+
+describe('WebSocket chat', () => {
+  it('broadcasts chat to everyone in the room', async () => {
+    room = buildStartedRoom();
+    const a = room.gameState.players[0];
+    const b = room.gameState.players[1];
+    const socketA = await openSynced(room.id, a.id, playerToken(a.id));
+    const socketB = await openSynced(room.id, b.id, playerToken(b.id));
+
+    socketA.send('chat', { text: '  привет команда  ' });
+    const msg = await socketB.next('chat');
+    expect(msg.payload).toMatchObject({
+      playerId: a.id,
+      playerName: a.name,
+      text: 'привет команда',
+    });
   });
 });
 
@@ -317,7 +388,7 @@ describe('WebSocket guess', () => {
     room.gameState.status = 'playing';
     const currentTeam = room.gameState.currentTurn;
     const guesser = room.gameState.players.find((p: Player) => p.team === currentTeam)!;
-    const socket = await openSynced(room.id, guesser.id, room.token);
+    const socket = await openSynced(room.id, guesser.id, playerToken(guesser.id));
 
     socket.send('guess', { cardIndex: 0 });
 
@@ -332,7 +403,7 @@ describe('WebSocket guess', () => {
     const currentTeam = room.gameState.currentTurn;
     const player = room.gameState.players.find((p: Player) => p.team === currentTeam)!;
     const assassinIndex = room.gameState.cards.findIndex((c: Card) => c.color === 'assassin');
-    const socket = await openSynced(room.id, player.id, room.token);
+    const socket = await openSynced(room.id, player.id, playerToken(player.id));
 
     socket.send('guess', { cardIndex: assassinIndex });
 
@@ -353,7 +424,7 @@ describe('WebSocket guess', () => {
     room = buildStartedRoom();
     const currentTeam = room.gameState.currentTurn;
     const player = room.gameState.players.find((p: Player) => p.team === currentTeam)!;
-    const socket = await openSynced(room.id, player.id, room.token);
+    const socket = await openSynced(room.id, player.id, playerToken(player.id));
 
     socket.send('guess', { cardIndex: 0 });
     await socket.drain();
@@ -367,7 +438,7 @@ describe('WebSocket guess', () => {
     room.gameState.status = 'playing';
     const otherTeam = room.gameState.currentTurn === 'red' ? 'blue' : 'red';
     const idlePlayer = room.gameState.players.find((p: Player) => p.team === otherTeam)!;
-    const socket = await openSynced(room.id, idlePlayer.id, room.token);
+    const socket = await openSynced(room.id, idlePlayer.id, playerToken(idlePlayer.id));
 
     socket.send('guess', { cardIndex: 0 });
     await socket.drain();
@@ -380,7 +451,7 @@ describe('WebSocket guess', () => {
     room.gameState.status = 'playing';
     const currentTeam = room.gameState.currentTurn;
     const player = room.gameState.players.find((p: Player) => p.team === currentTeam)!;
-    const socket = await openSynced(room.id, player.id, room.token);
+    const socket = await openSynced(room.id, player.id, playerToken(player.id));
 
     socket.send('guess', { cardIndex: 999 });
     socket.send('guess', { cardIndex: -1 });
@@ -394,7 +465,7 @@ describe('WebSocket guess', () => {
     room.gameState.status = 'playing';
     const currentTeam = room.gameState.currentTurn;
     const player = room.gameState.players.find((p: Player) => p.team === currentTeam)!;
-    const socket = await openSynced(room.id, player.id, room.token);
+    const socket = await openSynced(room.id, player.id, playerToken(player.id));
 
     socket.send('guess', { cardIndex: 0 });
     await socket.next('guess_result');
@@ -411,7 +482,7 @@ describe('WebSocket skip_turn', () => {
     room = buildStartedRoom();
     const currentTeam = room.gameState.currentTurn;
     const player = room.gameState.players.find((p: Player) => p.team === currentTeam)!;
-    const socket = await openSynced(room.id, player.id, room.token);
+    const socket = await openSynced(room.id, player.id, playerToken(player.id));
 
     socket.send('skip_turn');
 
@@ -425,7 +496,7 @@ describe('WebSocket skip_turn', () => {
     const currentTeam = room.gameState.currentTurn;
     const otherTeam = currentTeam === 'red' ? 'blue' : 'red';
     const idlePlayer = room.gameState.players.find((p: Player) => p.team === otherTeam)!;
-    const socket = await openSynced(room.id, idlePlayer.id, room.token);
+    const socket = await openSynced(room.id, idlePlayer.id, playerToken(idlePlayer.id));
 
     socket.send('skip_turn');
     await socket.drain();
@@ -437,8 +508,8 @@ describe('WebSocket skip_turn', () => {
 describe('WebSocket disconnection', () => {
   it('removes the player and notifies the others', async () => {
     room = buildStartedRoom();
-    const p1 = await openSynced(room.id, 'p1', room.token);
-    const p2 = await Socket.open(room.id, 'p2', room.token);
+    const p1 = await openSynced(room.id, 'p1', playerToken('p1'));
+    const p2 = await Socket.open(room.id, 'p2', playerToken('p2'));
     await p2.next('game_update');
     await p1.drain(80);
 
@@ -452,7 +523,7 @@ describe('WebSocket disconnection', () => {
   it('deletes the room when the last player disconnects', async () => {
     room = buildStartedRoom();
     const roomId = room.id;
-    const socket = await openSynced(roomId, 'p1', room.token);
+    const socket = await openSynced(roomId, 'p1', playerToken('p1'));
 
     await socket.close();
     await sleep(120);
@@ -464,7 +535,7 @@ describe('WebSocket disconnection', () => {
 describe('WebSocket protocol robustness', () => {
   it('survives malformed JSON and unknown message types', async () => {
     room = buildStartedRoom();
-    const socket = await openSynced(room.id, 'p1', room.token);
+    const socket = await openSynced(room.id, 'p1', playerToken('p1'));
 
     socket.sendRaw('this is not json');
     await sleep(80);
@@ -516,7 +587,7 @@ describe('Spectator mode', () => {
     room = buildStartedRoom();
     roomManager.join(room.id, 'Зритель', 'spec1', true);
 
-    const socket = await Socket.open(room.id, 'spec1', room.token);
+    const socket = await Socket.open(room.id, 'spec1', playerToken('spec1'));
     const list = await socket.next('player_list');
     expect((list.payload as Player[]).some((p: Player) => p.role === 'spectator')).toBe(true);
 
@@ -527,7 +598,7 @@ describe('Spectator mode', () => {
   it('ignores guesses and skips coming from a spectator', async () => {
     room = buildStartedRoom();
     roomManager.join(room.id, 'Зритель', 'spec1', true);
-    const socket = await openSynced(room.id, 'spec1', room.token);
+    const socket = await openSynced(room.id, 'spec1', playerToken('spec1'));
 
     const turnBefore = room.gameState.currentTurn;
     socket.send('guess', { cardIndex: 0 });
@@ -545,10 +616,10 @@ describe('Turn clock', () => {
     const spymaster = room.gameState.players.find(
       (p: Player) => p.role === 'spymaster' && p.team === room.gameState.currentTurn
     )!;
-    const socket = await openSynced(room.id, spymaster.id, room.token);
+    const socket = await openSynced(room.id, spymaster.id, playerToken(spymaster.id));
 
     expect(room.gameState.turnDeadline).toBeNull();
-    socket.send('start_round', { clue: { word: 'стек', count: 1 } });
+    await markAndClue(socket, room, { word: 'стек', count: 1 });
     const state = (await socket.next('game_update')).payload as GameState;
 
     expect(typeof state.turnDeadline).toBe('number');
@@ -560,7 +631,7 @@ describe('Turn clock', () => {
     room = buildStartedRoom();
     const currentTeam = room.gameState.currentTurn;
     const player = room.gameState.players.find((p: Player) => p.team === currentTeam)!;
-    const socket = await openSynced(room.id, player.id, room.token);
+    const socket = await openSynced(room.id, player.id, playerToken(player.id));
 
     roomManager.startTurnClock(room.id);
     expect(room.gameState.turnDeadline).not.toBeNull();
@@ -575,7 +646,7 @@ describe('Turn clock', () => {
     room = buildStartedRoom();
     const currentTeam = room.gameState.currentTurn;
     const player = room.gameState.players.find((p: Player) => p.team === currentTeam)!;
-    const socket = await openSynced(room.id, player.id, room.token);
+    const socket = await openSynced(room.id, player.id, playerToken(player.id));
 
     // Simulate an already expired round
     room.gameState.clues = { word: 'старый', count: 1 };

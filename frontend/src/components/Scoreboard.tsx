@@ -13,28 +13,24 @@ function Scoreboard({ scores, remaining, currentTurn }: ScoreboardProps) {
     <div className="scoreboard">
       <div className={`team-score team-red ${currentTurn === 'red' ? 'active' : ''}`}>
         <div className="score-header">
-          <span className="team-icon">🔴</span>
+          <span className="team-swatch red" aria-hidden="true" />
           <span className="team-name">Красные</span>
-          {currentTurn === 'red' && <span className="turn-indicator">➡️</span>}
+          {currentTurn === 'red' && <span className="turn-indicator">ход</span>}
         </div>
         <div className="score-value">{scores.red}</div>
-        <div className="score-remaining">
-          Осталось: {remaining.red}
-        </div>
+        <div className="score-remaining">осталось {remaining.red}</div>
       </div>
 
-      <div className="vs">VS</div>
+      <div className="vs" aria-hidden="true">×</div>
 
       <div className={`team-score team-blue ${currentTurn === 'blue' ? 'active' : ''}`}>
         <div className="score-header">
-          <span className="team-icon">🔵</span>
+          <span className="team-swatch blue" aria-hidden="true" />
           <span className="team-name">Синие</span>
-          {currentTurn === 'blue' && <span className="turn-indicator">➡️</span>}
+          {currentTurn === 'blue' && <span className="turn-indicator">ход</span>}
         </div>
         <div className="score-value">{scores.blue}</div>
-        <div className="score-remaining">
-          Осталось: {remaining.blue}
-        </div>
+        <div className="score-remaining">осталось {remaining.blue}</div>
       </div>
     </div>
   );

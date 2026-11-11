@@ -61,21 +61,23 @@ Response: { playerId: string, player: Player, gameState: GameState }
 ## Feature: Game Setup
 
 ### FR-004: Start Game
-**As a** room host with 3+ players, **I want to** start the game **so that** gameplay begins.
+**As a** seated player with 3+ active players and both teams, **I want to** start the game **so that** gameplay begins.
 
 **Acceptance Criteria:**
-- Host clicks "Start Game" button (visible when 3+ players present)
-- System assigns Spymaster role to first player of each team
+- Any authenticated seated player can click "Start Game" (visible when 3+ active players and both teams)
+- Missing spymasters are auto-assigned from the first player of each team if seats left empty
 - System generates and shuffles 25 cards
-- Cards are distributed: 8 red, 8 blue, 8 civilian, 1 assassin
+- Only the room host (creator) can start
+- Cards use classic 9/8: starting team 9, other 8, 7 civilian, 1 assassin
 - Game state transitions to "spymaster-ready"
+- Guesser clients receive card colors as null until reveal (server-side view filter)
 
 **Card Distribution:**
 | Color | Count | Description |
 |-------|-------|-------------|
-| Red | 8 | Team red's cards |
-| Blue | 8 | Team blue's cards |
-| Civilian | 8 | Neutral cards |
+| Starting team | 9 | Team that moves first |
+| Other team | 8 | Second team |
+| Civilian | 7 | Neutral cards |
 | Assassin | 1 | Instant loss |
 
 ### FR-005: Delete Room
@@ -90,19 +92,14 @@ Response: { playerId: string, player: Player, gameState: GameState }
 ## Feature: Gameplay
 
 ### FR-006: Give Clue
-**As a** spymaster of the current team, **I want to** see a clue word and card count **so that** I can direct my team.
+**As a** spymaster of the current team, **I want to** mark target cards and enter a clue word + count **so that** I can direct my team.
 
 **Acceptance Criteria:**
-- Spymaster of current team clicks "Give Clue"
-- System generates a clue word related to unrevealed cards of that team's color
-- System shows clue word + number of matching cards
-- Only the spymaster sees the clue initially
-
-**Clue Generation Heuristic:**
-1. Find unrevealed cards of the current team's color
-2. Categorize each word
-3. Pick the category with the most unrevealed cards
-4. Return a representative clue word + count
+- Spymaster marks ≥1 unrevealed target on the board (`mark_targets`)
+- Spymaster submits a human-entered clue (`word` + `count` 1..8) via `start_round`
+- Clue must not equal a board word
+- Team may guess up to `count + 1` times (classic bonus); miss or exhaustion ends the turn
+- Clue and targets are recorded in the match event log
 
 ### FR-007: Make a Guess
 **As a** team member, **I want to** click a card to guess its color **so that** we can reveal cards.

@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { GameState } from '../types';
+import type { ChatMessage, GameState } from '../types';
 
 /**
  * Durable snapshot of a room. WebSocket connections are transient and are
@@ -8,10 +8,14 @@ import type { GameState } from '../types';
  */
 export interface PersistedRoom {
   id: string;
+  /** @deprecated Legacy shared room token; prefer playerTokens. */
   token: string;
+  /** Per-player auth secrets. Missing on old snapshots — restored from token. */
+  playerTokens?: Record<string, string>;
   gameState: GameState;
   maxPlayers: number;
   createdAt: number;
+  chatMessages?: ChatMessage[];
 }
 
 export interface PersistenceStore {

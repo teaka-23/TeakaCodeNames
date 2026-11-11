@@ -15,13 +15,17 @@ describe('createGameState', () => {
     expect(gameState.cards).toEqual([]);
     expect(gameState.clues).toBeNull();
     expect(gameState.clueHistory).toEqual([]);
+    expect(gameState.eventLog).toEqual([]);
+    expect(gameState.clueTargets).toEqual([]);
     expect(gameState.scores).toEqual({ red: 0, blue: 0 });
     expect(gameState.remainingCards).toEqual({
       red: 8,
       blue: 8,
-      civilian: 8,
+      civilian: 7,
       assassin: 1,
     });
+    expect(gameState.hostId).toBe('');
+    expect(typeof gameState.turnDurationMs).toBe('number');
   });
 
   it('should set currentTurn to either red or blue', () => {
@@ -36,19 +40,14 @@ describe('generateCards', () => {
     expect(cards).toHaveLength(25);
   });
 
-  it('should have correct color distribution', () => {
-    const cards = generateCards();
+  it('should use classic 9/8 distribution for the starting team', () => {
+    const cards = generateCards('it', 'red');
     const colors = cards.map(c => c.color);
 
-    const redCount = colors.filter(c => c === 'red').length;
-    const blueCount = colors.filter(c => c === 'blue').length;
-    const civilianCount = colors.filter(c => c === 'civilian').length;
-    const assassinCount = colors.filter(c => c === 'assassin').length;
-
-    expect(redCount).toBe(8);
-    expect(blueCount).toBe(8);
-    expect(civilianCount).toBe(8);
-    expect(assassinCount).toBe(1);
+    expect(colors.filter(c => c === 'red').length).toBe(9);
+    expect(colors.filter(c => c === 'blue').length).toBe(8);
+    expect(colors.filter(c => c === 'civilian').length).toBe(7);
+    expect(colors.filter(c => c === 'assassin').length).toBe(1);
   });
 
   it('should have unique words', () => {
@@ -83,7 +82,9 @@ describe('handleGuess', () => {
   // Helper to create a test game state with cards
   function createTestGameState(): GameState {
     const gameState = createGameState('TEST', []);
-    gameState.cards = generateCards();
+    gameState.cards = generateCards('it', 'red');
+    gameState.currentTurn = 'red';
+    gameState.remainingCards = { red: 9, blue: 8, civilian: 7, assassin: 1 };
     return gameState;
   }
 
@@ -97,7 +98,7 @@ describe('handleGuess', () => {
     const { newState, gameOver } = handleGuess(gameState, redCardIndex);
 
     expect(newState.scores.red).toBe(1);
-    expect(newState.remainingCards.red).toBe(7);
+    expect(newState.remainingCards.red).toBe(8);
     expect(newState.cards[redCardIndex].revealed).toBe(true);
     expect(gameOver).toBe(false);
   });
@@ -163,7 +164,7 @@ describe('handleGuess', () => {
 
     expect(newState.currentTurn).toBe('blue');
     expect(newState.scores.red).toBe(0);
-    expect(newState.remainingCards.civilian).toBe(7);
+    expect(newState.remainingCards.civilian).toBe(6);
   });
 
   it('should end game and give opponent win on assassin', () => {
@@ -236,10 +237,11 @@ describe('shuffle correctness', () => {
     const civilianCount = colors.filter(c => c === 'civilian').length;
     const assassinCount = colors.filter(c => c === 'assassin').length;
 
-    // Verify distribution is correct (allowing for randomness in which cards)
+    // Classic 9/8 + 7 civilians + 1 assassin
     expect(redCount + blueCount + civilianCount + assassinCount).toBe(25);
     expect(assassinCount).toBe(1);
-    expect(civilianCount).toBe(8);
-    expect(redCount + blueCount).toBe(16);
+    expect(civilianCount).toBe(7);
+    expect(redCount + blueCount).toBe(17);
+    expect([redCount, blueCount].sort()).toEqual([8, 9]);
   });
 });

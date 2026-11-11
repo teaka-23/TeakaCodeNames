@@ -14,7 +14,7 @@ describe('Scoreboard', () => {
     expect(screen.getByText('Синие')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
-    expect(screen.getByText('VS')).toBeInTheDocument();
+    expect(screen.getByText('×')).toBeInTheDocument();
   });
 
   it('shows remaining cards for each team', () => {
@@ -26,8 +26,8 @@ describe('Scoreboard', () => {
       />
     );
 
-    expect(screen.getByText('Осталось: 6')).toBeInTheDocument();
-    expect(screen.getByText('Осталось: 2')).toBeInTheDocument();
+    expect(screen.getByText('осталось 6')).toBeInTheDocument();
+    expect(screen.getByText('осталось 2')).toBeInTheDocument();
   });
 
   it('marks the red team as active when it is their turn', () => {

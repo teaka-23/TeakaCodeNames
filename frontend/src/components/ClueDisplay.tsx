@@ -8,6 +8,8 @@ interface ClueDisplayProps {
   canStartRound: boolean;
   onStartRound: (clue?: { word: string; count: number }) => void;
   isSpymaster: boolean;
+  targetCount?: number;
+  guessesRemaining?: number | null;
 }
 
 function ClueDisplay({
@@ -16,6 +18,8 @@ function ClueDisplay({
   canStartRound,
   onStartRound,
   isSpymaster,
+  targetCount = 0,
+  guessesRemaining = null,
 }: ClueDisplayProps) {
   const [word, setWord] = useState('');
   const [count, setCount] = useState(1);
@@ -23,6 +27,10 @@ function ClueDisplay({
 
   const submitClue = () => {
     const trimmed = word.trim();
+    if (targetCount < 1) {
+      setError('Отметьте на доске хотя бы одну целевую карту');
+      return;
+    }
     if (!trimmed) {
       setError('Введите слово-подсказку');
       return;
@@ -43,7 +51,12 @@ function ClueDisplay({
     <div className={`clue-display team-${currentTurn}`}>
       {canStartRound ? (
         <div className="clue-prompt">
-          <p>Ваш ход, шпион! Придумайте подсказку для своей команды.</p>
+          <p>Ваш ход. Сначала кликните карты на доске (цели), затем введите подсказку.</p>
+          <p className="clue-targets-hint" aria-live="polite">
+            {targetCount < 1
+              ? 'Цели ещё не отмечены — кликните по картам на доске'
+              : `Отмечено целей: ${targetCount}`}
+          </p>
           <div className="clue-form">
             <input
               type="text"
@@ -60,7 +73,7 @@ function ClueDisplay({
               max={8}
               onChange={(e) => setCount(Number(e.target.value))}
             />
-            <button className="btn-get-clue" onClick={submitClue}>
+            <button className="btn-get-clue" onClick={submitClue} disabled={targetCount < 1}>
               Дать подсказку
             </button>
           </div>
@@ -69,12 +82,17 @@ function ClueDisplay({
       ) : clue ? (
         <div className="clue-card">
           <div className="clue-team">
-            {currentTurn === 'red' ? '🔴 Красные' : '🔵 Синие'} — ход
+            {currentTurn === 'red' ? 'Красные' : 'Синие'} — ход
           </div>
           <div className="clue-content">
             <span className="clue-word">{clue.word}</span>
             <span className="clue-count">{clue.count} карточек</span>
           </div>
+          {typeof guessesRemaining === 'number' && (
+            <p className="clue-guesses-left" aria-live="polite">
+              Осталось попыток: {guessesRemaining}
+            </p>
+          )}
           <p className="clue-instruction">
             {isSpymaster
               ? 'Ваша команда угадывает. Следите за доской!'
