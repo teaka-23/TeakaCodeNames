@@ -33,8 +33,9 @@ coverage/
 # Local tool permissions
 .gigacode/
 
-# Runtime data (room snapshots) — only repo-root /data, not frontend/src/data
+# Runtime data (room snapshots) — not frontend/src/data
 /data/
+backend/data/
 
 # Docker
 .docker/
