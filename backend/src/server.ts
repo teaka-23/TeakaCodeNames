@@ -16,6 +16,8 @@ const server = http.createServer(app);
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: false, // Allows inline styles for the SPA
+  // Frontend is on a different onrender.com host — allow cross-origin reads.
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 // Rate limiting
