@@ -1,17 +1,31 @@
 .landing-container {
   min-height: 100vh;
   color: var(--ink);
+  overflow-x: clip;
 }
 
 .landing-hero {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 2.5rem;
   align-items: center;
   max-width: 1180px;
+  width: 100%;
   margin: 0 auto;
   padding: 4rem 1.5rem 3rem;
+  box-sizing: border-box;
+}
+
+.hero-stage,
+.hero-felt {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.hero-stage {
+  container-type: inline-size;
+  container-name: hero;
 }
 
 .hero-kicker {
@@ -24,18 +38,21 @@
 
 .hero-title {
   font-family: var(--font-display);
-  font-size: clamp(3.2rem, 8vw, 5.5rem);
+  /* Scale to the stage width so "Codenames" stays on one line */
+  font-size: clamp(1.85rem, 9.6cqi, 5.5rem);
   font-weight: 800;
   line-height: 0.95;
   margin: 0 0 1.25rem;
   color: var(--ink);
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .hero-subtitle {
   font-size: 1.15rem;
   line-height: 1.55;
   color: var(--ink-muted);
-  max-width: 28rem;
+  max-width: min(28rem, 100%);
   margin: 0 0 2rem;
 }
 
@@ -88,8 +105,9 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 1.75rem;
-  min-height: 360px;
+  padding: clamp(1rem, 3vw, 1.75rem);
+  min-height: 280px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -99,8 +117,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.7rem;
-  width: 100%;
-  max-width: 22rem;
+  width: min(100%, 22rem);
   align-items: start;
 }
 
@@ -255,9 +272,13 @@
 
 @media (max-width: 900px) {
   .landing-hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     min-height: auto;
-    padding-top: 3rem;
+    padding: 3rem 1.25rem 2rem;
+  }
+
+  .hero-actions {
+    width: 100%;
   }
 
   .steps-grid,
@@ -265,8 +286,10 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .sample-grid {
-    max-width: 18rem;
+  .steps-grid > *,
+  .colors-grid > *,
+  .roles-grid > * {
+    min-width: 0;
   }
 }
 

@@ -55,6 +55,7 @@ body {
 
 #root {
   min-height: 100vh;
+  overflow-x: clip;
 }
 
 h1, h2, h3, h4, .font-display {
