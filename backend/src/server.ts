@@ -35,10 +35,20 @@ const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:3000', 'http://localhost'];
 
+function isAllowedOrigin(origin: string): boolean {
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return true;
+  // Render static + API often get different onrender.com suffixes
+  try {
+    return new URL(origin).hostname.endsWith('.onrender.com');
+  } catch {
+    return false;
+  }
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests without origin (curl, same-origin)
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    if (!origin || isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
       callback(null, false);
