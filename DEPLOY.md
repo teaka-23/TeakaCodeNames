@@ -25,11 +25,14 @@ npm run build
 | `codenames-api` | Web Service (Node) | `https://codenames-api.onrender.com` |
 | `codenames-web` | Static Site | `https://codenames-web.onrender.com` |
 
-Фронт на сборке получает `VITE_BACKEND_URL=https://codenames-api.onrender.com`.
-Бэкенд: `CORS_ORIGINS=https://codenames-web.onrender.com`. WebSocket: `wss://…/ws`.
+Blueprint связывает URL через `fromService` → `RENDER_EXTERNAL_URL`
+(имена могут получить суффикс, напр. `codenames-api-agv9.onrender.com`).
 
-Если Render добавит суффикс к имени сервиса — поправьте эти два URL в Dashboard
-и сделайте Manual Deploy у static site (чтобы Vite пересобрал бандл).
+- Фронт: `VITE_BACKEND_URL` = публичный URL API (WebSocket: `wss://…/ws`)
+- API: `CORS_ORIGINS` = публичный URL static site
+
+После смены этих env у Static Site нужен **Manual Deploy**, чтобы Vite
+пересобрал бандл с новым `VITE_BACKEND_URL`.
 
 ### Шаги
 

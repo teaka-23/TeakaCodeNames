@@ -1,6 +1,9 @@
 # Render Blueprint — Codenames IT Edition
 # Dashboard: https://dashboard.render.com/ → New → Blueprint
 # Docs: https://render.com/docs/infrastructure-as-code
+#
+# Service public URLs may get a suffix (e.g. codenames-api-agv9). Use
+# fromService → RENDER_EXTERNAL_URL so CORS / VITE always match.
 
 services:
   # ── Backend (Express + WebSocket) ──────────────────────────────
@@ -10,8 +13,8 @@ services:
     plan: free
     region: frankfurt
     rootDir: backend
-    # --include=dev: vite/tsc live in devDependencies; NODE_ENV=production
-    # would otherwise make `npm ci` omit them and break the build.
+    # --include=dev: tsc lives in devDependencies; NODE_ENV=production
+    # would otherwise make `npm ci` omit it and break the build.
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
@@ -25,7 +28,10 @@ services:
       # In-memory rooms on Free (no persistent disk). For paid + disk, set
       # PERSISTENCE_DRIVER=file and PERSISTENCE_FILE=/data/rooms.json.
       - key: CORS_ORIGINS
-        value: https://codenames-web.onrender.com
+        fromService:
+          name: codenames-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
 
   # ── Frontend (Vite static SPA) ─────────────────────────────────
   - type: web
@@ -50,4 +56,7 @@ services:
         value: "true"
       # Baked into the SPA at build time (browser → public API URL)
       - key: VITE_BACKEND_URL
-        value: https://codenames-api.onrender.com
+        fromService:
+          name: codenames-api
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
