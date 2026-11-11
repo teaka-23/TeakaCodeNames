@@ -35,6 +35,7 @@ function LandingPage() {
               ['🧘', 'Лотос'],
               ['🎬', 'Кадр'],
               ['🐳', 'Docker'],
+              ['☕', 'Java'],
             ].map(([picture, word]) => (
               <div key={word} className="sample-card">
                 <span className="sample-picture">{picture}</span>
